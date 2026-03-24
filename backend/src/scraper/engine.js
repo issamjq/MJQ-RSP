@@ -159,17 +159,35 @@ class ScraperEngine {
       const rawPriceText        = await this._extractFirst(page, priceSelectors);
       const rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
 
-      // Extract product thumbnail (og:image or site-specific fallbacks)
+      // Extract product thumbnail — try specific selectors before og:image
       const imageUrl = await page.evaluate(() => {
-        // Standard og:image
+        const src = (el) => el
+          ? (el.getAttribute('data-old-hires') || el.getAttribute('data-src') ||
+             el.getAttribute('data-lazy-src') || el.getAttribute('data-original') ||
+             el.getAttribute('src') || null)
+          : null;
+
+        // Amazon
+        const amz = document.querySelector('#landingImage, #imgTagWrapperId img, #main-image');
+        if (amz && src(amz) && !src(amz).includes('transparent-pixel')) return src(amz);
+
+        // Carrefour UAE (mafrservices CDN)
+        const crf = document.querySelector('[class*="product-image"] img, [class*="ProductImage"] img, [class*="gallery"] img[src*="mafrservices"]');
+        if (crf && src(crf)) return src(crf);
+
+        // Noon
+        const noon = document.querySelector('[class*="image-ratio"] img, [class*="ProductImage"] img, [data-qa="product-image"] img');
+        if (noon && src(noon)) return src(noon);
+
+        // Chemist Warehouse / generic Magento/WooCommerce
+        const gen = document.querySelector('.woocommerce-product-gallery__image img, .MagicZoomPlus img, .fotorama__img, [class*="product-image"] img');
+        if (gen && src(gen)) return src(gen);
+
+        // Standard og:image (last resort — often brand logo not product photo)
         const meta = document.querySelector('meta[property="og:image"], meta[name="og:image"]');
         if (meta?.getAttribute('content')) return meta.getAttribute('content');
-        // Amazon: high-res image
-        const amzImg = document.querySelector('#landingImage, #imgTagWrapperId img, #main-image');
-        if (amzImg) return amzImg.getAttribute('data-old-hires') || amzImg.getAttribute('data-src') || amzImg.getAttribute('src') || null;
-        // Generic: first product image
-        const img = document.querySelector('.product-image img, .product-img img, [class*="product"] img');
-        return img ? img.getAttribute('src') : null;
+
+        return null;
       }).catch(() => null);
 
       const { price, currency: detectedCurrency } = parsePrice(rawPriceText, currency);
