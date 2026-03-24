@@ -1,0 +1,28 @@
+# Render deployment config
+# https://render.com/docs/render-yaml-spec
+
+services:
+  - type: web
+    name: rsp-price-monitor-backend
+    runtime: node
+    plan: starter           # or free
+    region: frankfurt       # closest to UAE
+    buildCommand: npm install && npx playwright install chromium
+    startCommand: npm start
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: PLAYWRIGHT_HEADLESS
+        value: true
+      - key: SCRAPER_TIMEOUT_MS
+        value: 30000
+      - key: SCRAPER_CONCURRENCY
+        value: 2              # keep low on free tier
+      - key: DATABASE_URL
+        sync: false           # set manually in Render dashboard
+      - key: CORS_ORIGIN
+        sync: false           # set to your frontend URL
