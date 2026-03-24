@@ -63,11 +63,11 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
   useEffect(() => {
     if (printedRef.current) return;
     printedRef.current = true;
-    // Small delay so images render before printing
+    // Wait for external images (CDN) to load before printing
     const timer = setTimeout(() => {
       window.print();
       onClose();
-    }, 600);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [onClose]);
 
@@ -78,14 +78,15 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
 
   return (
     <>
-      {/* Hide everything else when printing */}
+      {/* visibility trick: child can override parent's visibility:hidden, but not display:none */}
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          #pdf-print-root { display: block !important; }
+          * { visibility: hidden !important; }
+          #pdf-print-root, #pdf-print-root * { visibility: visible !important; }
+          #pdf-print-root { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; background: white !important; }
           @page { margin: 15mm 12mm; size: A4 portrait; }
         }
-        #pdf-print-root { display: none; }
+        #pdf-print-root { visibility: hidden; position: fixed; top: -9999px; left: 0; width: 100%; }
       `}</style>
 
       <div id="pdf-print-root">
