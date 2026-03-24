@@ -207,7 +207,7 @@ export function ModernSidebar({
               <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
               <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
             </svg>
-            <span className="text-sm font-semibold dark:text-white text-foreground tracking-tight">RSP Monitor</span>
+            <span className="text-sm font-semibold dark:text-white text-foreground tracking-tight">MJQ App</span>
           </div>
         )}
         {collapsed && (
