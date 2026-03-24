@@ -112,8 +112,8 @@ async function scrapeAndSave(urlRecord, engine) {
     last_checked_at: new Date(),
     // Backfill external_title if we found one and don't have one yet
     ...(result.title    && !urlRecord.external_title ? { external_title: result.title    } : {}),
-    // Backfill image_url if we found one and don't have one yet
-    ...(result.imageUrl && !urlRecord.image_url      ? { image_url:      result.imageUrl } : {}),
+    // Always update image_url if scraper found one (og:image is more reliable than discovery thumbnails)
+    ...(result.imageUrl ? { image_url: result.imageUrl } : {}),
   });
 
   return { snapshot, scrapeResult: result };
