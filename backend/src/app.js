@@ -18,12 +18,8 @@ const discoveryRouter         = require('./routes/discovery');
 const app = express();
 
 // ── Security & Parsing ──────────────────────────────────────────
-app.use(helmet());
-const corsOrigin = process.env.CORS_ORIGIN || '*';
-app.use(cors({
-  origin:      corsOrigin === '*' ? true : corsOrigin,
-  credentials: true,
-}));
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
