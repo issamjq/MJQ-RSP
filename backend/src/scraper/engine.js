@@ -159,10 +159,17 @@ class ScraperEngine {
       const rawPriceText        = await this._extractFirst(page, priceSelectors);
       const rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
 
-      // Extract og:image for product thumbnail
+      // Extract product thumbnail (og:image or site-specific fallbacks)
       const imageUrl = await page.evaluate(() => {
+        // Standard og:image
         const meta = document.querySelector('meta[property="og:image"], meta[name="og:image"]');
-        return meta ? meta.getAttribute('content') : null;
+        if (meta?.getAttribute('content')) return meta.getAttribute('content');
+        // Amazon: high-res image
+        const amzImg = document.querySelector('#landingImage, #imgTagWrapperId img, #main-image');
+        if (amzImg) return amzImg.getAttribute('data-old-hires') || amzImg.getAttribute('data-src') || amzImg.getAttribute('src') || null;
+        // Generic: first product image
+        const img = document.querySelector('.product-image img, .product-img img, [class*="product"] img');
+        return img ? img.getAttribute('src') : null;
       }).catch(() => null);
 
       const { price, currency: detectedCurrency } = parsePrice(rawPriceText, currency);
