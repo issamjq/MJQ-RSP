@@ -8,7 +8,7 @@ const { parsePagination } = require('../utils/helpers');
  */
 async function create({
   product_id, company_id, product_company_url_id,
-  title_found, price, currency, availability,
+  title_found, price, original_price, currency, availability,
   raw_price_text, raw_availability_text,
   scrape_status, error_message,
   checked_at,
@@ -16,17 +16,18 @@ async function create({
   const { rows } = await db.query(
     `INSERT INTO price_snapshots
        (product_id, company_id, product_company_url_id,
-        title_found, price, currency, availability,
+        title_found, price, original_price, currency, availability,
         raw_price_text, raw_availability_text,
         scrape_status, error_message, checked_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING *`,
     [
       product_id, company_id, product_company_url_id,
-      title_found || null,
-      price       !== undefined ? price : null,
-      currency    || 'AED',
-      availability || 'unknown',
+      title_found    || null,
+      price          !== undefined ? price : null,
+      original_price !== undefined ? original_price : null,
+      currency       || 'AED',
+      availability   || 'unknown',
       raw_price_text        || null,
       raw_availability_text || null,
       scrape_status  || 'success',

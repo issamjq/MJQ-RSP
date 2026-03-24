@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { BarChart2, RefreshCw, TrendingDown, TrendingUp, Minus, ExternalLink } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { BarChart2, RefreshCw, TrendingDown, TrendingUp, Minus, ExternalLink, Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { toast } from "sonner@2.0.3";
 import {
@@ -38,6 +38,162 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function PriceCell({ snap }: { snap: PriceSnapshot }) {
+  if (snap.price === null) return <span className="text-xs dark:text-muted-foreground text-muted-foreground">—</span>;
+  const hasDiscount = snap.original_price !== null && snap.original_price > snap.price;
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="font-semibold dark:text-white text-foreground">
+        {snap.currency} {Number(snap.price).toFixed(2)}
+      </span>
+      {hasDiscount && (
+        <span className="text-[11px] line-through dark:text-muted-foreground/60 text-muted-foreground/60">
+          {snap.currency} {Number(snap.original_price).toFixed(2)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── PDF Print View ─────────────────────────────────────────────────
+
+function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onClose: () => void }) {
+  const printedRef = useRef(false);
+
+  useEffect(() => {
+    if (printedRef.current) return;
+    printedRef.current = true;
+    // Small delay so images render before printing
+    const timer = setTimeout(() => {
+      window.print();
+      onClose();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const now = new Date().toLocaleDateString("en-AE", {
+    day: "2-digit", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+
+  return (
+    <>
+      {/* Hide everything else when printing */}
+      <style>{`
+        @media print {
+          body > * { display: none !important; }
+          #pdf-print-root { display: block !important; }
+          @page { margin: 15mm 12mm; size: A4 portrait; }
+        }
+        #pdf-print-root { display: none; }
+      `}</style>
+
+      <div id="pdf-print-root">
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, borderBottom: "2px solid #6E76FF", paddingBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <svg width="32" height="32" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="38" height="38" rx="12" fill="#6E76FF"/>
+              <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff"/>
+              <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
+              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
+              <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
+            </svg>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>Price Report — MJQ App</div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>Generated: {now}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "#6b7280", textAlign: "right" }}>
+            {snapshots.length} product{snapshots.length !== 1 ? "s" : ""}
+          </div>
+        </div>
+
+        {/* Cards grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+          {snapshots.map(snap => {
+            const hasDiscount = snap.original_price !== null && snap.original_price > (snap.price ?? 0);
+            return (
+              <div key={snap.id} style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                padding: 12,
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+                breakInside: "avoid",
+              }}>
+                {/* Product image */}
+                <div style={{ flexShrink: 0, width: 64, height: 64, borderRadius: 8, overflow: "hidden", background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {snap.image_url
+                    ? <img src={snap.image_url} alt="" style={{ width: 64, height: 64, objectFit: "contain" }} />
+                    : <span style={{ fontSize: 20 }}>📦</span>
+                  }
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: "#111827", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {snap.internal_name}
+                  </div>
+                  {snap.title_found && snap.title_found !== snap.internal_name && (
+                    <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {snap.title_found}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+                    {snap.company_name}
+                  </div>
+
+                  {/* Price row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {snap.price !== null ? (
+                      <>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: hasDiscount ? "#dc2626" : "#111827" }}>
+                          {snap.currency} {Number(snap.price).toFixed(2)}
+                        </span>
+                        {hasDiscount && (
+                          <span style={{ fontSize: 11, color: "#9ca3af", textDecoration: "line-through" }}>
+                            {snap.currency} {Number(snap.original_price).toFixed(2)}
+                          </span>
+                        )}
+                        {hasDiscount && (
+                          <span style={{ fontSize: 10, background: "#fee2e2", color: "#dc2626", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>
+                            -{Math.round((1 - snap.price / snap.original_price!) * 100)}%
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>No price</span>
+                    )}
+                  </div>
+
+                  {/* Availability + date */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                      background: snap.availability === "in_stock" ? "#dcfce7" : snap.availability === "out_of_stock" ? "#fee2e2" : "#f3f4f6",
+                      color: snap.availability === "in_stock" ? "#16a34a" : snap.availability === "out_of_stock" ? "#dc2626" : "#6b7280",
+                    }}>
+                      {snap.availability === "in_stock" ? "In Stock" : snap.availability === "out_of_stock" ? "Out of Stock" : snap.availability || "Unknown"}
+                    </span>
+                    <span style={{ fontSize: 10, color: "#9ca3af" }}>{formatDate(snap.checked_at)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: 24, paddingTop: 10, borderTop: "1px solid #e5e7eb", fontSize: 10, color: "#9ca3af", textAlign: "center" }}>
+          MJQ App — Price Monitoring Report · {now}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────
 
 type TabMode = "latest" | "all";
@@ -52,6 +208,7 @@ export function PriceSnapshotsPage() {
   const [filterComp, setFilterComp] = useState("");
   const [filterProd, setFilterProd] = useState("");
   const [page,       setPage]       = useState(1);
+  const [showPdf,    setShowPdf]    = useState(false);
 
   const LIMIT = 30;
 
@@ -107,8 +264,18 @@ export function PriceSnapshotsPage() {
         : "dark:text-muted-foreground text-muted-foreground border-transparent dark:hover:text-foreground hover:text-foreground"
     }`;
 
+  const successSnaps = snapshots.filter(s => s.scrape_status === "success");
+
   return (
     <div className="space-y-6">
+      {/* PDF Print View — only visible during print */}
+      {showPdf && (
+        <PdfPrintView
+          snapshots={successSnaps}
+          onClose={() => setShowPdf(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -117,11 +284,23 @@ export function PriceSnapshotsPage() {
             {tab === "latest" ? "Latest price per product per company" : `${total} total snapshots`}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}
-          className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPdf(true)}
+            disabled={loading || successSnaps.length === 0}
+            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20"
+          >
+            <Download className="h-4 w-4" />
+            Export PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}
+            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -191,13 +370,7 @@ export function PriceSnapshotsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {snap.price !== null ? (
-                        <span className="font-semibold dark:text-white text-foreground">
-                          {snap.currency} {Number(snap.price).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-xs dark:text-muted-foreground text-muted-foreground">—</span>
-                      )}
+                      <PriceCell snap={snap} />
                     </td>
                     <td className="px-5 py-3.5 hidden sm:table-cell">
                       <AvailBadge avail={snap.availability} />

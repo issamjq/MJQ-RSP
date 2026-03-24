@@ -97,6 +97,7 @@ async function scrapeAndSave(urlRecord, engine) {
     product_company_url_id: urlRecord.id,
     title_found:            result.title,
     price:                  result.price,
+    original_price:         result.originalPrice,
     currency:               result.currency,
     availability:           result.availability,
     raw_price_text:         result.rawPriceText,

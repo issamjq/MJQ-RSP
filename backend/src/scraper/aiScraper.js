@@ -40,14 +40,16 @@ async function extractWithVision(page, currency = 'AED', apiKey) {
 Extract the following fields from what you see on screen and return ONLY a JSON object:
 
 {
-  "price": <number or null — the selling/discounted price as a number, e.g. 49.25>,
+  "price": <number or null — the FINAL/discounted price the customer pays, e.g. 49.25>,
+  "original_price": <number or null — the crossed-out/before-discount price, e.g. 65.00. null if no discount is shown>,
   "currency": "<3-letter currency code, e.g. AED, USD — default to ${currency} if unclear>",
   "title": "<full product name as shown on page, or null>",
   "availability": "<one of: in_stock, out_of_stock, unknown>"
 }
 
 Rules:
-- price: use the FINAL price (after discount if any), not the crossed-out original price
+- price: the highlighted/current selling price (what customer pays now)
+- original_price: ONLY set if a strikethrough/was-price is visibly shown next to the current price; otherwise null
 - title: the main product heading, include size/variant (e.g. "Marvis Classic Strong Mint 75ml")
 - availability: "in_stock" if Add to Cart / Buy Now is active, "out_of_stock" if sold out, else "unknown"
 - Return ONLY the JSON object, no explanation, no markdown`;
@@ -100,13 +102,14 @@ Rules:
   });
 
   return {
-    price:               parsed.price     ?? null,
-    currency:            parsed.currency  || currency,
-    title:               parsed.title     || null,
+    price:               parsed.price          ?? null,
+    originalPrice:       parsed.original_price ?? null,
+    currency:            parsed.currency       || currency,
+    title:               parsed.title          || null,
     availability:        mapAvailability(parsed.availability),
-    rawPriceText:        parsed.price     ? String(parsed.price) : null,
-    rawTitleText:        parsed.title     || null,
-    rawAvailabilityText: parsed.availability || null,
+    rawPriceText:        parsed.price          ? String(parsed.price) : null,
+    rawTitleText:        parsed.title          || null,
+    rawAvailabilityText: parsed.availability   || null,
   };
 }
 

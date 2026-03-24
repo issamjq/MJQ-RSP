@@ -161,7 +161,7 @@ class ScraperEngine {
       }
 
       // ── Extract fields ────────────────────────────────────────────────────
-      let rawTitleText, rawPriceText, rawAvailabilityText, price, detectedCurrency, availability;
+      let rawTitleText, rawPriceText, rawAvailabilityText, price, originalPrice, detectedCurrency, availability;
 
       if (aiApiKey) {
         // ── AI Vision path: Claude looks at screenshot, extracts everything ──
@@ -176,6 +176,7 @@ class ScraperEngine {
           rawTitleText        = aiResult.rawTitleText;
           rawAvailabilityText = aiResult.rawAvailabilityText;
           price               = aiResult.price;
+          originalPrice       = aiResult.originalPrice ?? null;
           detectedCurrency    = aiResult.currency;
           availability        = aiResult.availability;
         } else {
@@ -185,6 +186,7 @@ class ScraperEngine {
           rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
           const parsed        = parsePrice(rawPriceText, currency);
           price               = parsed.price;
+          originalPrice       = null;
           detectedCurrency    = parsed.currency;
           availability        = parseAvailability(rawAvailabilityText);
         }
@@ -195,6 +197,7 @@ class ScraperEngine {
         rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
         const parsed        = parsePrice(rawPriceText, currency);
         price               = parsed.price;
+        originalPrice       = null;
         detectedCurrency    = parsed.currency;
         availability        = parseAvailability(rawAvailabilityText);
       }
@@ -208,6 +211,7 @@ class ScraperEngine {
         success:              true,
         title:                rawTitleText ? rawTitleText.trim().slice(0, 500) : null,
         price,
+        originalPrice:        originalPrice || null,
         currency:             detectedCurrency,
         availability,
         imageUrl:             imageUrl || null,

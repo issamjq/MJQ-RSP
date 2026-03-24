@@ -70,6 +70,7 @@ export interface PriceSnapshot {
   product_company_url_id: number | null;
   title_found: string | null;
   price: number | null;
+  original_price: number | null;
   currency: string;
   availability: string;
   raw_price_text: string | null;
