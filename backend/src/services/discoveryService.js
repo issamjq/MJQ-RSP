@@ -17,6 +17,142 @@ const { getSearchConfig }= require('../scraper/searchConfigs');
 const { fuzzyMatch }     = require('./matchingService');
 const logger             = require('../utils/logger');
 
+// ── Website Probe (auto-detect search URL) ────────────────────────────────────
+
+const SEARCH_PATTERNS = [
+  '/search?q={query}',
+  '/search/?q={query}',
+  '/catalogsearch/result/?q={query}',
+  '/en/catalogsearch/result/?q={query}',
+  '/en/search?q={query}',
+  '/?s={query}&post_type=product',
+  '/search?keyword={query}',
+  '/search?text={query}',
+  '/search-results?q={query}',
+];
+
+/**
+ * Try loading a URL and return how many product-like links were found.
+ */
+async function trySearchPattern(engine, url) {
+  const context = await engine.browser.newContext({
+    userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    locale:     'en-AE',
+    timezoneId: 'Asia/Dubai',
+    viewport:   { width: 1366, height: 768 },
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    window.chrome = { runtime: {} };
+  });
+  await context.route('**/*', (route) => {
+    if (['image', 'font', 'media'].includes(route.request().resourceType())) {
+      route.abort();
+    } else {
+      route.continue();
+    }
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+
+    const links = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('a[href]')).map((a) => ({
+        text: (a.textContent || '').replace(/\s+/g, ' ').trim(),
+        href: a.href,
+      }))
+    ).catch(() => []);
+
+    // Filter to links that look like product pages
+    const seen     = new Set();
+    const products = [];
+    for (const l of links) {
+      if (!l.text || l.text.length < 4)   continue;
+      if (!l.href || !l.href.startsWith('http')) continue;
+      if (l.href.includes('#'))             continue;
+      try {
+        const u     = new URL(l.href);
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length < 1) continue;
+        // Skip obvious nav/category links
+        const p = u.pathname.toLowerCase();
+        if (p.match(/\/(login|signup|cart|checkout|account|wishlist|category|categories|blog|contact|about|policy|faq|deals|offer)\b/)) continue;
+        const key = u.origin + u.pathname;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        products.push({ name: l.text.slice(0, 120), url: key });
+      } catch { continue; }
+    }
+
+    // Guess product URL pattern from sample links
+    let productUrlPattern = null;
+    if (products.length > 0) {
+      const patternCounts = {};
+      const KNOWN = ['/products/', '/product/', '/p/', '/dp/', '/buy-', '/item/', '.html'];
+      for (const prod of products) {
+        for (const pat of KNOWN) {
+          if (prod.url.includes(pat)) {
+            patternCounts[pat] = (patternCounts[pat] || 0) + 1;
+          }
+        }
+      }
+      const best = Object.entries(patternCounts).sort((a, b) => b[1] - a[1])[0];
+      productUrlPattern = best ? best[0] : null;
+    }
+
+    return { found: products.length, sample: products.slice(0, 5), productUrlPattern };
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Probe a website to auto-detect its search URL pattern.
+ * Tries common patterns and returns the first one that finds products.
+ *
+ * @param {string} baseUrl - e.g. "https://www.example.com"
+ * @param {string} testQuery - search term to test with (e.g. "shampoo")
+ */
+async function probeWebsite(baseUrl, testQuery = 'shampoo') {
+  const base   = baseUrl.replace(/\/$/, '');
+  const engine = new ScraperEngine();
+
+  try {
+    await engine.launch();
+
+    for (const pattern of SEARCH_PATTERNS) {
+      const url = base + pattern.replace('{query}', encodeURIComponent(testQuery));
+      logger.info('[Probe] Trying pattern', { pattern, url });
+
+      try {
+        const result = await trySearchPattern(engine, url);
+        logger.info('[Probe] Pattern result', { pattern, found: result.found });
+
+        if (result.found >= 3) {
+          return {
+            success:            true,
+            search_url_template: base + pattern,
+            pattern,
+            products_found:     result.found,
+            product_url_pattern: result.productUrlPattern,
+            sample:             result.sample,
+          };
+        }
+      } catch (err) {
+        logger.debug('[Probe] Pattern failed', { pattern, error: err.message });
+      }
+    }
+
+    return {
+      success: false,
+      message: 'Could not detect a working search URL. The site may require JavaScript interaction or use a non-standard search system.',
+    };
+  } finally {
+    await engine.close();
+  }
+}
+
 // ── Claude extraction + matching ──────────────────────────────────────────────
 
 /**
@@ -233,9 +369,17 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
   // ── 3. Resolve the URL to load ─────────────────────────────────────────────
   const config    = getSearchConfig(company.slug, company.base_url);
   config._searchQuery = searchQuery; // make query available to postLoad
+
+  // Check if a custom search URL template was saved via probe
+  const { rows: cfgRows } = await query(
+    `SELECT page_options FROM company_configs WHERE company_id = $1`, [companyId]
+  ).catch(() => ({ rows: [] }));
+  const savedPageOptions     = cfgRows[0]?.page_options || {};
+  const customSearchTemplate = savedPageOptions.search_url_template;
+
   const searchUrl = typeof config.resolveUrl === 'function'
     ? config.resolveUrl(searchQuery)
-    : config.searchUrl
+    : (customSearchTemplate || config.searchUrl)
         .replace('{query}',        encodeURIComponent(searchQuery))
         .replace('{website_url}',  company.base_url || '');
 
@@ -352,4 +496,4 @@ async function confirmMappings(companyId, mappings) {
   return { added };
 }
 
-module.exports = { discoverProducts, confirmMappings };
+module.exports = { discoverProducts, confirmMappings, probeWebsite };

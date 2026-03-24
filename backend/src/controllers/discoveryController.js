@@ -1,6 +1,6 @@
 'use strict';
 
-const { discoverProducts, confirmMappings } = require('../services/discoveryService');
+const { discoverProducts, confirmMappings, probeWebsite } = require('../services/discoveryService');
 const { createError }                       = require('../middleware/errorHandler');
 const logger                                = require('../utils/logger');
 
@@ -63,4 +63,26 @@ async function confirm(req, res, next) {
   }
 }
 
-module.exports = { search, confirm };
+/**
+ * POST /api/discovery/probe
+ * Body: { url: string, query?: string }
+ *
+ * Auto-detects the search URL pattern for a website.
+ * Returns the working search URL template and sample products found.
+ */
+async function probe(req, res, next) {
+  try {
+    const url = (req.body.url || '').trim();
+    if (!url || !url.startsWith('http')) {
+      return next(createError('url is required and must start with http', 400, 'VALIDATION_ERROR'));
+    }
+    const testQuery = (req.body.query || 'shampoo').toString().trim();
+    logger.info('[DiscoveryCtrl] probe', { url, testQuery });
+    const result = await probeWebsite(url, testQuery);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { search, confirm, probe };

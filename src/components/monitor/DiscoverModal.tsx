@@ -125,7 +125,7 @@ function CompanyPicker({
 export function DiscoverModal({ open, onClose, companies, products, onAdded }: DiscoverModalProps) {
   const [step,              setStep]              = useState<1 | 2>(1);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
-  const [query,             setQuery]             = useState("marvis");
+  const [query,             setQuery]             = useState("");
   const [loading,           setLoading]           = useState(false);
   const [results,           setResults]           = useState<EnrichedMatch[]>([]);
   const [totalFound,        setTotalFound]        = useState(0);
@@ -254,7 +254,7 @@ export function DiscoverModal({ open, onClose, companies, products, onAdded }: D
   const handleClose = () => {
     setStep(1);
     setSelectedCompanyId(null);
-    setQuery("marvis");
+    setQuery("");
     setResults([]);
     setTotalFound(0);
     setSelectedOverrides({});
@@ -306,11 +306,11 @@ export function DiscoverModal({ open, onClose, companies, products, onAdded }: D
               {/* Search query */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">
-                  Search Query
+                  Search Query <span className="dark:text-muted-foreground/60 text-muted-foreground/60 font-normal">(any brand or product name)</span>
                 </label>
                 <input
                   className={inputCls}
-                  placeholder="e.g. marvis"
+                  placeholder="e.g. marvis, dove, colgate…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   disabled={loading}

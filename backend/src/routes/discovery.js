@@ -11,4 +11,8 @@ router.post('/search', ctrl.search);
 // Body: { company_id: number, mappings: Array<{ product_id: number, url: string }> }
 router.post('/confirm', ctrl.confirm);
 
+// Auto-detect search URL pattern for any website
+// Body: { url: string, query?: string }
+router.post('/probe', ctrl.probe);
+
 module.exports = router;

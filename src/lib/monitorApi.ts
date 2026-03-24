@@ -132,6 +132,9 @@ export const companiesApi = {
 
   delete: (id: number) =>
     api.del<{ success: boolean; message: string }>(`/api/companies/${id}`),
+
+  upsertConfig: (id: number, body: { page_options?: Record<string, unknown>; notes?: string }) =>
+    api.put<ApiResponse<unknown>>(`/api/companies/${id}/config`, body),
 };
 
 // ── Products ──────────────────────────────────────────────────────
@@ -250,9 +253,21 @@ export interface DiscoveryResult {
   query: string;
 }
 
+export interface ProbeResult {
+  success: boolean;
+  search_url_template?: string;
+  pattern?: string;
+  products_found?: number;
+  product_url_pattern?: string | null;
+  sample?: Array<{ name: string; url: string }>;
+  message?: string;
+}
+
 export const discoveryApi = {
   search: (companyId: number, query: string) =>
     api.post<ApiResponse<DiscoveryResult>>('/api/discovery/search', { company_id: companyId, query }),
   confirm: (companyId: number, mappings: Array<{ product_id: number; url: string; image_url?: string | null }>) =>
     api.post<ApiResponse<{ added: number }>>('/api/discovery/confirm', { company_id: companyId, mappings }),
+  probe: (url: string, query?: string) =>
+    api.post<ApiResponse<ProbeResult>>('/api/discovery/probe', { url, query }),
 };
