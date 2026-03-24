@@ -404,20 +404,36 @@ const searchConfigs = {
   },
 
   'talabat': {
-    // Talabat Mart — SPA, search triggered by typing into search box
+    // Talabat Mart Dubai — open store page directly, type search query into box
     searchUrl:       'https://www.talabat.com/uae/grocery/600398/talabat-mart?aid=1244',
-    pageOptions:     { waitUntil: 'domcontentloaded', timeout: 35000 },
+    pageOptions:     { waitUntil: 'networkidle', timeout: 40000 },
     blockResources:  ['font', 'media'],
-    waitForSelector: 'input[type="search"], input[placeholder*="Search"], input[placeholder*="search"]',
+    waitForSelector: 'input',
     productUrlPattern: /\/item\/\d+/,
 
-    // Type the search query into Talabat's search box and wait for results
     async postLoad(page, _url, searchQuery) {
-      const searchBox = await page.$('input[type="search"], input[placeholder*="Search"], input[placeholder*="search"]');
-      if (!searchBox) return;
-      await searchBox.click();
-      await searchBox.fill(searchQuery || 'marvis');
-      await page.waitForTimeout(3000);
+      const q = searchQuery || 'marvis';
+      // Try multiple selectors for Talabat's search input
+      const selectors = [
+        'input[placeholder*="Search"]',
+        'input[placeholder*="search"]',
+        'input[type="search"]',
+        'input[type="text"]',
+        'input',
+      ];
+      let box = null;
+      for (const sel of selectors) {
+        box = await page.$(sel).catch(() => null);
+        if (box) break;
+      }
+      if (!box) return;
+      await box.click();
+      await box.fill('');
+      // Type character by character to trigger React's onChange
+      for (const char of q) {
+        await box.type(char, { delay: 80 });
+      }
+      await page.waitForTimeout(4000); // wait for SPA results to render
       await page.waitForSelector('a[href*="/item/"]', { timeout: 10000 }).catch(() => {});
     },
 
