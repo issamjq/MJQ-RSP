@@ -60,21 +60,20 @@ async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, pr
     `You are matching product links scraped from ${companyName} to an internal product catalog.\n\n` +
     `Internal catalog (id: name):\n${catalogText}\n\n` +
     `Product links found on the page (index: "text" → URL):${patternHint}\n${linksText}\n\n` +
-    `Your task:\n` +
-    `1. Each link above is a product page URL — match it to the best catalog entry\n` +
-    `2. Skip links that are clearly duplicates of the same product\n` +
-    `3. Be smart about name differences:\n` +
-    `   - "75ml" = "75 mL" = "75ML"\n` +
-    `   - Missing commas, different word order\n` +
-    `   - Abbreviated brand names ("Marvis WM" = "Marvis Whitening Mint")\n` +
-    `   - SIZE MUST MATCH: 25ml ≠ 75ml even if same flavor\n\n` +
-    `Return ONLY a JSON array, no explanation:\n` +
+    `Your task: Match each product link to the correct catalog entry.\n\n` +
+    `STRICT MATCHING RULES — read carefully:\n` +
+    `1. SIZE/VOLUME MUST MATCH EXACTLY: 25ml ≠ 75ml ≠ 85ml ≠ 100ml. Never match different sizes.\n` +
+    `2. FLAVOR/VARIANT MUST MATCH: "Classic" ≠ "Whitening" ≠ "Ginger". Same brand, different flavor = no match.\n` +
+    `3. PRODUCT TYPE MUST MATCH: Toothpaste ≠ Mouthwash ≠ Toothbrush.\n` +
+    `4. Ignore minor formatting: "75ml" = "75 mL" = "75ML", word order differences, extra words like "Toothpaste".\n` +
+    `5. If a catalog entry has "75ml" and the link has "85ml" or no size info — set confidence below 0.6.\n` +
+    `6. When in doubt, do NOT match (null). A missed match is better than a wrong match.\n\n` +
+    `Return ONLY a JSON array:\n` +
     `[{"i": 0, "catalog_id": 5, "confidence": 0.95}]\n\n` +
-    `Rules:\n` +
-    `- "i" is the link index from the list above\n` +
-    `- "catalog_id" is the internal product id (or null if no good match)\n` +
-    `- "confidence" is 0-1, only include entries > 0.6\n` +
-    `- One product page can match at most one catalog entry`;
+    `- "i" = link index\n` +
+    `- "catalog_id" = internal product id (null if no confident match)\n` +
+    `- "confidence" = 0.0–1.0, only include entries ≥ 0.75\n` +
+    `- One link matches at most one catalog entry`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method:  'POST',

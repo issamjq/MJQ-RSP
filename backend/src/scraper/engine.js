@@ -2,6 +2,7 @@
 
 const { chromium } = require('playwright');
 const { parsePrice, parseAvailability } = require('./priceParser');
+const { extractWithVision, extractImageUrl } = require('./aiScraper');
 const logger = require('../utils/logger');
 
 /**
@@ -126,10 +127,17 @@ class ScraperEngine {
         }
       });
 
-      // Block heavy resources to speed up page load
+      const aiApiKey = process.env.ANTHROPIC_API_KEY;
+
+      // For AI vision: allow images to load (don't block them)
+      // For selector mode: block images for speed
+      const resourcesToBlock = aiApiKey
+        ? blockResources.filter(r => r !== 'image')
+        : blockResources;
+
       await context.route('**/*', (route) => {
         const type = route.request().resourceType();
-        if (blockResources.includes(type)) {
+        if (resourcesToBlock.includes(type)) {
           route.abort();
         } else {
           route.continue();
@@ -138,14 +146,12 @@ class ScraperEngine {
 
       page = await context.newPage();
 
-      logger.debug('[Scraper] Navigating', { url });
+      logger.debug('[Scraper] Navigating', { url, mode: aiApiKey ? 'AI Vision' : 'Selectors' });
       await page.goto(url, pageOptions).catch((err) => {
-        // Timeout on 'load' is common for heavy sites (ads/analytics still loading).
-        // The SSR HTML and price are already in the DOM — continue with extraction.
         logger.debug('[Scraper] goto timed out, extracting anyway', { url, error: err.message });
       });
 
-      // Optional: wait for a key element before extracting
+      // Wait for key element
       if (waitForSelector) {
         await page
           .waitForSelector(waitForSelector, { timeout: 10000 })
@@ -154,51 +160,47 @@ class ScraperEngine {
           });
       }
 
-      // Extract fields
-      const rawTitleText        = await this._extractFirst(page, titleSelectors);
-      const rawPriceText        = await this._extractFirst(page, priceSelectors);
-      const rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
+      // ── Extract fields ────────────────────────────────────────────────────
+      let rawTitleText, rawPriceText, rawAvailabilityText, price, detectedCurrency, availability;
 
-      // Extract product thumbnail — try specific selectors before og:image
-      const imageUrl = await page.evaluate(() => {
-        const src = (el) => el
-          ? (el.getAttribute('data-old-hires') || el.getAttribute('data-src') ||
-             el.getAttribute('data-lazy-src') || el.getAttribute('data-original') ||
-             el.getAttribute('src') || null)
-          : null;
-
-        // Amazon
-        const amz = document.querySelector('#landingImage, #imgTagWrapperId img, #main-image');
-        if (amz && src(amz) && !src(amz).includes('transparent-pixel')) return src(amz);
-
-        // Carrefour UAE (mafrservices CDN)
-        const crf = document.querySelector('[class*="product-image"] img, [class*="ProductImage"] img, [class*="gallery"] img[src*="mafrservices"]');
-        if (crf && src(crf)) return src(crf);
-
-        // Noon — product images at f.nooncdn.com/p/pzsku/ (check src AND data-src for lazy loading)
-        const noonImg = Array.from(document.querySelectorAll('img')).find(img => {
-          const s = img.getAttribute('src') || img.getAttribute('data-src') || '';
-          return s.includes('f.nooncdn.com/p/') && !s.includes('/icons/') && !s.includes('.svg');
+      if (aiApiKey) {
+        // ── AI Vision path: Claude looks at screenshot, extracts everything ──
+        logger.info('[Scraper] Using Claude Vision for extraction', { url });
+        const aiResult = await extractWithVision(page, currency, aiApiKey).catch((err) => {
+          logger.warn('[Scraper] Vision failed, falling back to selectors', { error: err.message });
+          return null;
         });
-        if (noonImg) return noonImg.getAttribute('src') || noonImg.getAttribute('data-src');
 
-        // Talabat (dhmedia CDN)
-        const tal = document.querySelector('img[src*="dhmedia"], img[src*="talabat"], [class*="swiper"] img, [class*="product-image"] img, [class*="itemImage"] img');
-        if (tal && src(tal) && src(tal).startsWith('http')) return src(tal);
+        if (aiResult && aiResult.price !== null) {
+          rawPriceText        = aiResult.rawPriceText;
+          rawTitleText        = aiResult.rawTitleText;
+          rawAvailabilityText = aiResult.rawAvailabilityText;
+          price               = aiResult.price;
+          detectedCurrency    = aiResult.currency;
+          availability        = aiResult.availability;
+        } else {
+          // Fallback to selectors if AI failed
+          rawTitleText        = await this._extractFirst(page, titleSelectors);
+          rawPriceText        = await this._extractFirst(page, priceSelectors);
+          rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
+          const parsed        = parsePrice(rawPriceText, currency);
+          price               = parsed.price;
+          detectedCurrency    = parsed.currency;
+          availability        = parseAvailability(rawAvailabilityText);
+        }
+      } else {
+        // ── Selector path (no API key) ─────────────────────────────────────
+        rawTitleText        = await this._extractFirst(page, titleSelectors);
+        rawPriceText        = await this._extractFirst(page, priceSelectors);
+        rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
+        const parsed        = parsePrice(rawPriceText, currency);
+        price               = parsed.price;
+        detectedCurrency    = parsed.currency;
+        availability        = parseAvailability(rawAvailabilityText);
+      }
 
-        // Chemist Warehouse / generic Magento/WooCommerce
-        const gen = document.querySelector('.woocommerce-product-gallery__image img, .MagicZoomPlus img, .fotorama__img, [class*="product-image"] img');
-        if (gen && src(gen)) return src(gen);
-
-        // Standard og:image (last resort — often brand logo not product photo)
-        const meta = document.querySelector('meta[property="og:image"], meta[name="og:image"]');
-        if (meta?.getAttribute('content')) return meta.getAttribute('content');
-
-        return null;
-      }).catch(() => null);
-
-      const { price, currency: detectedCurrency } = parsePrice(rawPriceText, currency);
-      const availability = parseAvailability(rawAvailabilityText);
+      // ── Extract image URL (always from page HTML, AI can't return URLs) ──
+      const imageUrl = await extractImageUrl(page);
 
       await context.close();
 
