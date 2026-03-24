@@ -94,7 +94,7 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
       {/* width: 190mm = A4 (210mm) minus 2×10mm margins — renders at true A4 size, no scaling */}
       <div id="pdf-print-root" style={{ width: "190mm", fontFamily: "Arial, Helvetica, sans-serif", fontSize: "9pt", color: "#111827" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5mm", borderBottom: "2px solid #6E76FF", paddingBottom: "3mm" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "3mm", borderBottom: "2px solid #6E76FF", paddingBottom: "2mm" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <svg width="28" height="28" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
               <rect x="0" y="0" width="38" height="38" rx="12" fill="#6E76FF"/>
@@ -114,25 +114,25 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
         </div>
 
         {/* Cards grid — two equal columns using a table-like approach for reliable print rendering */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5mm", width: "100%" }}>
           {snapshots.map(snap => {
             const hasDiscount = snap.original_price !== null && snap.original_price > (snap.price ?? 0);
             return (
               <div key={snap.id} style={{
                 border: "1px solid #e5e7eb",
                 borderRadius: "6px",
-                padding: "3mm",
+                padding: "2mm",
                 display: "flex",
-                gap: "3mm",
+                gap: "2mm",
                 alignItems: "flex-start",
                 breakInside: "avoid",
                 boxSizing: "border-box",
                 minWidth: 0,
               }}>
                 {/* Product image */}
-                <div style={{ flexShrink: 0, width: "14mm", height: "14mm", borderRadius: "4px", overflow: "hidden", background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ flexShrink: 0, width: "12mm", height: "12mm", borderRadius: "4px", overflow: "hidden", background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {snap.image_url
-                    ? <img src={snap.image_url} alt="" style={{ width: "14mm", height: "14mm", objectFit: "contain" }} />
+                    ? <img src={snap.image_url} alt="" style={{ width: "12mm", height: "12mm", objectFit: "contain" }} />
                     : <span style={{ fontSize: "16pt" }}>📦</span>
                   }
                 </div>
@@ -192,7 +192,7 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: "5mm", paddingTop: "3mm", borderTop: "1px solid #e5e7eb", fontSize: "7pt", color: "#9ca3af", textAlign: "center" }}>
+        <div style={{ marginTop: "3mm", paddingTop: "2mm", borderTop: "1px solid #e5e7eb", fontSize: "7pt", color: "#9ca3af", textAlign: "center" }}>
           MJQ App — Price Monitoring Report · {now}
         </div>
       </div>
