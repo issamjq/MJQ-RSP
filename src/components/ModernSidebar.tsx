@@ -192,11 +192,35 @@ export function ModernSidebar({
         dark:bg-gradient-to-b dark:from-[#0E0E18] dark:to-[#0A0A0F] bg-gradient-to-b from-[#fafafa] to-[#f5f5f5]`}
       style={{ boxShadow: "2px 0 24px rgba(0, 0, 0, 0.08)" }}
     >
-      {/* Empty header section - logo moved to topbar - no harsh divider */}
+      {/* Empty header section */}
       <div className="h-16"></div>
 
       {/* Navigation Sections */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Logo above nav */}
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 px-3 pb-3 border-b dark:border-white/5 border-border mb-1">
+            <svg width="32" height="32" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="38" height="38" rx="12" fill="#ffffff"/>
+              <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff" style={{filter:"drop-shadow(0px 4px 14px rgba(0,0,0,0.12))"}}/>
+              <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
+              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
+              <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
+            </svg>
+            <span className="text-sm font-semibold dark:text-white text-foreground tracking-tight">RSP Monitor</span>
+          </div>
+        )}
+        {collapsed && (
+          <div className="flex justify-center pb-3 border-b dark:border-white/5 border-border mb-1">
+            <svg width="28" height="28" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="38" height="38" rx="12" fill="#ffffff"/>
+              <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff" style={{filter:"drop-shadow(0px 4px 14px rgba(0,0,0,0.12))"}}/>
+              <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
+              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
+              <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
+            </svg>
+          </div>
+        )}
         {sections.map((section, idx) => (
           <div key={idx} className="space-y-0.5">
             {!collapsed && section.title && (

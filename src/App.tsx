@@ -45,7 +45,10 @@ export default function App() {
     return savedState === "true";
   });
   
-  const [activePage, setActivePage] = useState<Page>("monitor-dashboard");
+  const [activePage, setActivePage] = useState<Page>(() => {
+    const saved = localStorage.getItem("activePage") as Page | null;
+    return saved ?? "monitor-dashboard";
+  });
   const [dateRange, setDateRange] = useState<DateRange>("7days");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
     "Boutique Alice",
@@ -53,6 +56,11 @@ export default function App() {
     "Margo Vintage",
   ]);
   const [settingsTab, setSettingsTab] = useState<"profile" | "security" | "preferences" | "employee" | "subscription">("profile");
+
+  // Persist active page to localStorage
+  useEffect(() => {
+    localStorage.setItem("activePage", activePage);
+  }, [activePage]);
 
   // Persist theme to localStorage and apply to document
   useEffect(() => {
