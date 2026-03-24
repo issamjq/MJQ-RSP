@@ -203,22 +203,23 @@ const searchConfigs = {
 
   // ── Pharmacies & New Companies ───────────────────────────────────────────────
 
-  // Life Pharmacy UAE — custom Magento-like platform
+  // Life Pharmacy UAE — React SPA, search via URL param
   'life-pharmacy': {
-    searchUrl:        'https://www.lifepharmacy.com/search?q={query}',
-    pageOptions:      { waitUntil: 'domcontentloaded', timeout: 30000 },
-    blockResources:   ['image', 'font', 'media'],
-    waitForSelector:  'a[href*="/products/"]',
-    productUrlPattern: /lifepharmacy\.com\/products\//,
+    searchUrl:         'https://www.lifepharmacy.com/search?q={query}',
+    pageOptions:       { waitUntil: 'networkidle', timeout: 40000 },
+    blockResources:    ['font', 'media'],
+    waitForSelector:   'a[href*="/product/"]',
+    productUrlPattern: /lifepharmacy\.com\/product\//,
+
     async extractProducts(page) {
       return page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a[href*="/products/"]'));
+        const anchors = Array.from(document.querySelectorAll('a[href*="/product/"]'));
         const seen = new Set(); const results = [];
         for (const a of anchors) {
           const url = (a.href || '').split('?')[0];
           if (!url || seen.has(url)) continue; seen.add(url);
           const name = a.textContent.replace(/\s+/g, ' ').trim();
-          if (name && url) results.push({ name, url });
+          if (name.length > 3 && url) results.push({ name, url });
         }
         return results;
       });

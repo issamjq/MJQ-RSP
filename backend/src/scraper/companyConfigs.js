@@ -187,6 +187,33 @@ const configs = {
     blockResources: ['image', 'font'],
   },
 
+  'life-pharmacy': {
+    priceSelectors: [
+      '[class*="price"] span',
+      '[class*="Price"] span',
+      '[data-testid*="price"]',
+      '[class*="selling-price"]',
+      '[class*="current-price"]',
+      'meta[property="product:price:amount"]',
+    ],
+    titleSelectors: [
+      'h1[class*="product"]',
+      'h1[class*="name"]',
+      'h1[class*="title"]',
+      'h1',
+    ],
+    availabilitySelectors: [
+      '[class*="stock"]',
+      '[class*="availability"]',
+      '[data-testid*="stock"]',
+      'button[class*="add-to-cart"]',
+    ],
+    waitForSelector: 'h1',
+    pageOptions: { waitUntil: 'networkidle', timeout: 40000 },
+    currency: 'AED',
+    blockResources: ['font', 'media'],
+  },
+
   // Generic fallback — used when no slug-specific config exists
   _default: {
     priceSelectors: [
