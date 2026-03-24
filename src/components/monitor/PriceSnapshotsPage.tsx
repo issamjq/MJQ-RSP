@@ -85,16 +85,18 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
         @media print {
           #root { display: none !important; }
           #pdf-print-root { display: block !important; }
-          @page { margin: 15mm 12mm; size: A4 portrait; }
+          @page { margin: 10mm; size: A4 portrait; }
+          #pdf-print-root * { box-sizing: border-box !important; }
         }
         #pdf-print-root { display: none; }
       `}</style>
 
-      <div id="pdf-print-root">
+      {/* width: 190mm = A4 (210mm) minus 2×10mm margins — renders at true A4 size, no scaling */}
+      <div id="pdf-print-root" style={{ width: "190mm", fontFamily: "Arial, Helvetica, sans-serif", fontSize: "9pt", color: "#111827" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, borderBottom: "2px solid #6E76FF", paddingBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <svg width="32" height="32" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5mm", borderBottom: "2px solid #6E76FF", paddingBottom: "3mm" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <svg width="28" height="28" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
               <rect x="0" y="0" width="38" height="38" rx="12" fill="#6E76FF"/>
               <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff"/>
               <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
@@ -102,84 +104,86 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
               <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
             </svg>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>Price Report — MJQ App</div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>Generated: {now}</div>
+              <div style={{ fontSize: "13pt", fontWeight: 700, color: "#111827", lineHeight: 1.2 }}>Price Report — MJQ App</div>
+              <div style={{ fontSize: "8pt", color: "#6b7280" }}>Generated: {now}</div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "#6b7280", textAlign: "right" }}>
+          <div style={{ fontSize: "8pt", color: "#6b7280" }}>
             {snapshots.length} product{snapshots.length !== 1 ? "s" : ""}
           </div>
         </div>
 
-        {/* Cards grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+        {/* Cards grid — two equal columns using a table-like approach for reliable print rendering */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", width: "100%" }}>
           {snapshots.map(snap => {
             const hasDiscount = snap.original_price !== null && snap.original_price > (snap.price ?? 0);
             return (
               <div key={snap.id} style={{
                 border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                padding: 12,
+                borderRadius: "6px",
+                padding: "3mm",
                 display: "flex",
-                gap: 12,
+                gap: "3mm",
                 alignItems: "flex-start",
                 breakInside: "avoid",
+                boxSizing: "border-box",
+                minWidth: 0,
               }}>
                 {/* Product image */}
-                <div style={{ flexShrink: 0, width: 64, height: 64, borderRadius: 8, overflow: "hidden", background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ flexShrink: 0, width: "14mm", height: "14mm", borderRadius: "4px", overflow: "hidden", background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {snap.image_url
-                    ? <img src={snap.image_url} alt="" style={{ width: 64, height: 64, objectFit: "contain" }} />
-                    : <span style={{ fontSize: 20 }}>📦</span>
+                    ? <img src={snap.image_url} alt="" style={{ width: "14mm", height: "14mm", objectFit: "contain" }} />
+                    : <span style={{ fontSize: "16pt" }}>📦</span>
                   }
                 </div>
 
                 {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: "#111827", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                  <div style={{ fontWeight: 700, fontSize: "8.5pt", color: "#111827", marginBottom: "1mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {snap.internal_name}
                   </div>
                   {snap.title_found && snap.title_found !== snap.internal_name && (
-                    <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: "7pt", color: "#9ca3af", marginBottom: "1mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {snap.title_found}
                     </div>
                   )}
-                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+                  <div style={{ fontSize: "7.5pt", color: "#6b7280", marginBottom: "1.5mm", fontStyle: "italic" }}>
                     {snap.company_name}
                   </div>
 
                   {/* Price row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "2mm", flexWrap: "wrap" }}>
                     {snap.price !== null ? (
                       <>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: hasDiscount ? "#dc2626" : "#111827" }}>
+                        <span style={{ fontWeight: 700, fontSize: "10pt", color: hasDiscount ? "#dc2626" : "#111827" }}>
                           {snap.currency} {Number(snap.price).toFixed(2)}
                         </span>
                         {hasDiscount && (
-                          <span style={{ fontSize: 11, color: "#9ca3af", textDecoration: "line-through" }}>
+                          <span style={{ fontSize: "7.5pt", color: "#9ca3af", textDecoration: "line-through" }}>
                             {snap.currency} {Number(snap.original_price).toFixed(2)}
                           </span>
                         )}
                         {hasDiscount && (
-                          <span style={{ fontSize: 10, background: "#fee2e2", color: "#dc2626", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>
+                          <span style={{ fontSize: "7pt", background: "#fee2e2", color: "#dc2626", padding: "0 2mm", borderRadius: "3px", fontWeight: 700 }}>
                             -{Math.round((1 - snap.price / snap.original_price!) * 100)}%
                           </span>
                         )}
                       </>
                     ) : (
-                      <span style={{ fontSize: 12, color: "#9ca3af" }}>No price</span>
+                      <span style={{ fontSize: "8pt", color: "#9ca3af" }}>No price</span>
                     )}
                   </div>
 
                   {/* Availability + date */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginTop: "1.5mm", flexWrap: "wrap" }}>
                     <span style={{
-                      fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                      fontSize: "7pt", fontWeight: 700, padding: "0 2mm", borderRadius: "3px",
                       background: snap.availability === "in_stock" ? "#dcfce7" : snap.availability === "out_of_stock" ? "#fee2e2" : "#f3f4f6",
                       color: snap.availability === "in_stock" ? "#16a34a" : snap.availability === "out_of_stock" ? "#dc2626" : "#6b7280",
                     }}>
                       {snap.availability === "in_stock" ? "In Stock" : snap.availability === "out_of_stock" ? "Out of Stock" : snap.availability || "Unknown"}
                     </span>
-                    <span style={{ fontSize: 10, color: "#9ca3af" }}>{formatDate(snap.checked_at)}</span>
+                    <span style={{ fontSize: "7pt", color: "#9ca3af" }}>{formatDate(snap.checked_at)}</span>
                   </div>
                 </div>
               </div>
@@ -188,7 +192,7 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: 24, paddingTop: 10, borderTop: "1px solid #e5e7eb", fontSize: 10, color: "#9ca3af", textAlign: "center" }}>
+        <div style={{ marginTop: "5mm", paddingTop: "3mm", borderTop: "1px solid #e5e7eb", fontSize: "7pt", color: "#9ca3af", textAlign: "center" }}>
           MJQ App — Price Monitoring Report · {now}
         </div>
       </div>
