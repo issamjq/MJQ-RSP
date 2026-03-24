@@ -174,32 +174,49 @@ const searchConfigs = {
     },
   },
 
-  // Grandiose UAE — Magento + Klevu search (correct URL: /search/?q=)
-  // NOTE: Does not carry Marvis products as of discovery.
+  // Grandiose UAE — Magento + Klevu search.
+  // Products are loaded via Klevu widget which requires location context in browser.
+  // Fix: call Klevu API directly from within the page (avoids CORS, uses correct API key).
   'grandiose': {
     searchUrl:        'https://www.grandiose.ae/search/?q={query}',
-    pageOptions:      { waitUntil: 'networkidle', timeout: 40000 },
+    pageOptions:      { waitUntil: 'domcontentloaded', timeout: 30000 },
     blockResources:   ['image', 'font', 'media'],
     waitForSelector:  null,
-    productUrlPattern: /grandiose\.ae\/[a-z0-9-]+\.html/,
+    productUrlPattern: /grandiose\.ae\/[a-z0-9-]+\d+$/,
 
-    async extractProducts(page) {
-      return page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a'));
-        const seen    = new Set();
-        const results = [];
-        for (const a of anchors) {
-          const href = a.href || '';
-          if (!href.match(/grandiose\.ae\/[a-z0-9-]+\.html/)) continue;
-          if (href.includes('/catalogsearch') || href.includes('/customer') || href.includes('/checkout')) continue;
-          const url = href.split('?')[0];
-          if (!url || seen.has(url)) continue;
-          seen.add(url);
-          const name = a.textContent.replace(/\s+/g, ' ').trim();
-          if (name && url) results.push({ name, url });
+    async extractProducts(page, searchQuery) {
+      // Extract search term from URL
+      const url   = page.url();
+      const query = new URL(url).searchParams.get('q') || 'marvis';
+
+      return page.evaluate(async (q) => {
+        try {
+          const res = await fetch('https://eucs32v2.ksearchnet.com/cs/v2/search', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              context:       { apiKeys: ['klevu-168907907563213805'] },
+              recordQueries: [{
+                id:              'productSearch',
+                typeOfRequest:   'SEARCH',
+                settings: {
+                  query:         { term: q },
+                  typeOfRecords: ['KLEVU_PRODUCT'],
+                  limit:         50,
+                  offset:        0,
+                },
+              }],
+            }),
+          });
+          const data    = await res.json();
+          const records = data?.queryResults?.[0]?.records || [];
+          return records
+            .filter(r => r.url && r.name)
+            .map(r => ({ name: r.name, url: r.url.split('?')[0] }));
+        } catch (e) {
+          return [];
         }
-        return results;
-      });
+      }, query);
     },
   },
 

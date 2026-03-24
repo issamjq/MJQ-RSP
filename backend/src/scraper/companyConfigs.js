@@ -187,6 +187,32 @@ const configs = {
     blockResources: ['image', 'font'],
   },
 
+  // Grandiose UAE — Magento, product URLs: /slug{id} (no .html)
+  'grandiose': {
+    priceSelectors: [
+      '.price-box .price',
+      '[data-price-type="finalPrice"] .price',
+      '.special-price .price',
+      '.regular-price .price',
+      '[itemprop="price"]',
+    ],
+    titleSelectors: [
+      'h1.page-title span',
+      'h1[itemprop="name"]',
+      'h1',
+    ],
+    availabilitySelectors: [
+      '.stock.available',
+      '.stock.unavailable',
+      '[class*="in-stock"]',
+      '[class*="out-of-stock"]',
+    ],
+    waitForSelector: 'h1',
+    pageOptions: { waitUntil: 'networkidle', timeout: 40000 },
+    currency: 'AED',
+    blockResources: ['font', 'media'],
+  },
+
   // Bin Sina — Magento
   'bin-sina': {
     priceSelectors: [
