@@ -175,12 +175,13 @@ class ScraperEngine {
         const crf = document.querySelector('[class*="product-image"] img, [class*="ProductImage"] img, [class*="gallery"] img[src*="mafrservices"]');
         if (crf && src(crf)) return src(crf);
 
-        // Noon — look for nooncdn.com image directly
-        const noonCdn = Array.from(document.querySelectorAll('img[src*="nooncdn.com"]'))
-          .find(img => img.getAttribute('src') && !img.getAttribute('src').includes('transparent'));
-        if (noonCdn) return noonCdn.getAttribute('src');
-        const noon = document.querySelector('[class*="image-ratio"] img, [class*="ProductImage"] img, [data-qa="product-image"] img');
-        if (noon && src(noon) && src(noon).includes('nooncdn')) return src(noon);
+        // Noon — product images are at f.nooncdn.com/p/pzsku/
+        const noonImg = Array.from(document.querySelectorAll('img'))
+          .find(img => {
+            const s = img.getAttribute('src') || '';
+            return s.includes('f.nooncdn.com/p/pzsku') || s.includes('f.nooncdn.com/p/v');
+          });
+        if (noonImg) return noonImg.getAttribute('src');
 
         // Talabat (dhmedia CDN)
         const tal = document.querySelector('img[src*="dhmedia"], img[src*="talabat"], [class*="swiper"] img, [class*="product-image"] img, [class*="itemImage"] img');
