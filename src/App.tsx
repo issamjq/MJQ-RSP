@@ -29,7 +29,7 @@ export default function App() {
   // Load theme from localStorage or default to dark
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const savedTheme = localStorage.getItem("theme");
-    return (savedTheme === "light" || savedTheme === "dark") ? savedTheme : "dark";
+    return (savedTheme === "light" || savedTheme === "dark") ? savedTheme : "light";
   });
   
   // Load language from localStorage or default to en
