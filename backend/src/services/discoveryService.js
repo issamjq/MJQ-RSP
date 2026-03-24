@@ -185,6 +185,13 @@ async function loadPage(engine, url, config) {
       .catch(() => logger.debug('[Discovery] waitForSelector timed out', { selector: config.waitForSelector }));
   }
 
+  // Allow config to interact with the page after load (e.g. type in search box)
+  if (typeof config.postLoad === 'function') {
+    await config.postLoad(page, url, config._searchQuery).catch((err) =>
+      logger.debug('[Discovery] postLoad failed', { error: err.message })
+    );
+  }
+
   return { page, context };
 }
 
@@ -211,6 +218,7 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
 
   // ── 3. Resolve the URL to load ─────────────────────────────────────────────
   const config    = getSearchConfig(company.slug, company.base_url);
+  config._searchQuery = searchQuery; // make query available to postLoad
   const searchUrl = typeof config.resolveUrl === 'function'
     ? config.resolveUrl(searchQuery)
     : config.searchUrl

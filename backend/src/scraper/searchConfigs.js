@@ -404,27 +404,34 @@ const searchConfigs = {
   },
 
   'talabat': {
-    // Talabat Mart grocery store — search within the store page
-    // Store: Talabat Mart Al Wasl (600398) — adjust store ID if needed
-    searchUrl:       'https://www.talabat.com/uae/grocery/600398/talabat-mart?aid=1244&q={query}',
+    // Talabat Mart — SPA, search triggered by typing into search box
+    searchUrl:       'https://www.talabat.com/uae/grocery/600398/talabat-mart?aid=1244',
     pageOptions:     { waitUntil: 'domcontentloaded', timeout: 35000 },
     blockResources:  ['font', 'media'],
-    waitForSelector: '[class*="itemName"], [class*="product-name"], h3, [data-testid="item-name"]',
-    productUrlPattern: /\/grocery\/\d+\/.+\/\d+/,
+    waitForSelector: 'input[type="search"], input[placeholder*="Search"], input[placeholder*="search"]',
+    productUrlPattern: /\/item\/\d+/,
+
+    // Type the search query into Talabat's search box and wait for results
+    async postLoad(page, _url, searchQuery) {
+      const searchBox = await page.$('input[type="search"], input[placeholder*="Search"], input[placeholder*="search"]');
+      if (!searchBox) return;
+      await searchBox.click();
+      await searchBox.fill(searchQuery || 'marvis');
+      await page.waitForTimeout(3000);
+      await page.waitForSelector('a[href*="/item/"]', { timeout: 10000 }).catch(() => {});
+    },
 
     async extractProducts(page) {
       return page.evaluate(() => {
         const results = [];
         const seen = new Set();
-        // Talabat product cards link to individual item pages
-        const anchors = Array.from(document.querySelectorAll('a[href*="/grocery/"]'));
+        const anchors = Array.from(document.querySelectorAll('a[href*="/item/"]'));
         for (const a of anchors) {
           const url = (a.href || '').split('?')[0];
           if (!url || seen.has(url)) continue;
-          // Must be a product page (has numeric item ID at end)
-          if (!/\/grocery\/\d+\/.+\/\d+/.test(url)) continue;
+          if (!/\/item\/\d+/.test(url)) continue;
           seen.add(url);
-          const nameEl = a.querySelector('[class*="itemName"], [class*="name"], h3, p');
+          const nameEl = a.querySelector('[class*="name"], [class*="title"], p, span');
           const name = (nameEl?.textContent || a.textContent || '').replace(/\s+/g, ' ').trim();
           if (name.length > 3) results.push({ name, url });
         }
