@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { BarChart2, RefreshCw, TrendingDown, TrendingUp, Minus, ExternalLink, Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { toast } from "sonner@2.0.3";
@@ -76,17 +77,17 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
     hour: "2-digit", minute: "2-digit",
   });
 
-  return (
+  // Render as a portal directly on document.body (outside #root)
+  // so we can safely display:none #root without hiding the print content
+  return createPortal(
     <>
-      {/* visibility trick: child can override parent's visibility:hidden, but not display:none */}
       <style>{`
         @media print {
-          * { visibility: hidden !important; }
-          #pdf-print-root, #pdf-print-root * { visibility: visible !important; }
-          #pdf-print-root { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; background: white !important; }
+          #root { display: none !important; }
+          #pdf-print-root { display: block !important; }
           @page { margin: 15mm 12mm; size: A4 portrait; }
         }
-        #pdf-print-root { visibility: hidden; position: fixed; top: -9999px; left: 0; width: 100%; }
+        #pdf-print-root { display: none; }
       `}</style>
 
       <div id="pdf-print-root">
@@ -191,7 +192,8 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
           MJQ App — Price Monitoring Report · {now}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
