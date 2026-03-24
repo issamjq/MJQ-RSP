@@ -32,6 +32,22 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return json as T;
 }
 
+/**
+ * Fetch with one automatic retry on network errors (CORS/connection failures
+ * during Render restarts). API errors (4xx/5xx) are NOT retried.
+ */
+async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (networkErr) {
+    // Wait 2 seconds then retry once — handles brief Render restart window
+    await new Promise(r => setTimeout(r, 2000));
+    return fetch(url, options);
+  }
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
 export async function get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
   let url = `${BASE_URL}${path}`;
 
@@ -43,34 +59,32 @@ export async function get<T>(path: string, params?: Record<string, string | numb
     if (qs) url += `?${qs}`;
   }
 
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-  });
+  const res = await fetchWithRetry(url, { headers: JSON_HEADERS });
   return handleResponse<T>(res);
 }
 
 export async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: JSON_HEADERS,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handleResponse<T>(res);
 }
 
 export async function put<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: JSON_HEADERS,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handleResponse<T>(res);
 }
 
 export async function del<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: JSON_HEADERS,
   });
   return handleResponse<T>(res);
 }

@@ -17,11 +17,30 @@ const discoveryRouter         = require('./routes/discovery');
 
 const app = express();
 
+// Disable ETags — prevents 304 "Not Modified" on JSON API responses
+app.set('etag', false);
+
 // ── Security & Parsing ──────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors());
+
+// CORS — explicit options so preflight OPTIONS always gets correct headers
+app.use(cors({
+  origin: true,           // reflect the request origin (allows all)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  maxAge: 86400,          // cache preflight result for 24h in browsers
+}));
+app.options('*', cors()); // handle preflight for ALL routes explicitly
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// No caching on any /api route — always return fresh data
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // ── Logging ─────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
