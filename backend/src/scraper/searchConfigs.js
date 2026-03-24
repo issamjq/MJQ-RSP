@@ -402,6 +402,36 @@ const searchConfigs = {
       });
     },
   },
+
+  'talabat': {
+    // Talabat Mart grocery store — search within the store page
+    // Store: Talabat Mart Al Wasl (600398) — adjust store ID if needed
+    searchUrl:       'https://www.talabat.com/uae/grocery/600398/talabat-mart?aid=1244&q={query}',
+    pageOptions:     { waitUntil: 'domcontentloaded', timeout: 35000 },
+    blockResources:  ['font', 'media'],
+    waitForSelector: '[class*="itemName"], [class*="product-name"], h3, [data-testid="item-name"]',
+    productUrlPattern: /\/grocery\/\d+\/.+\/\d+/,
+
+    async extractProducts(page) {
+      return page.evaluate(() => {
+        const results = [];
+        const seen = new Set();
+        // Talabat product cards link to individual item pages
+        const anchors = Array.from(document.querySelectorAll('a[href*="/grocery/"]'));
+        for (const a of anchors) {
+          const url = (a.href || '').split('?')[0];
+          if (!url || seen.has(url)) continue;
+          // Must be a product page (has numeric item ID at end)
+          if (!/\/grocery\/\d+\/.+\/\d+/.test(url)) continue;
+          seen.add(url);
+          const nameEl = a.querySelector('[class*="itemName"], [class*="name"], h3, p');
+          const name = (nameEl?.textContent || a.textContent || '').replace(/\s+/g, ' ').trim();
+          if (name.length > 3) results.push({ name, url });
+        }
+        return results;
+      });
+    },
+  },
 };
 
 /**
