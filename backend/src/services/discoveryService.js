@@ -238,7 +238,10 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
           text: (a.textContent || '').replace(/\s+/g, ' ').trim(),
           href: a.href,
         }))
-      );
+      ).catch((err) => {
+        logger.debug('[Discovery] page.evaluate failed (likely redirect/bot block)', { error: err.message });
+        return [];
+      });
 
       logger.info('[Discovery] Total links on page', { count: pageLinks.length });
 
