@@ -108,7 +108,7 @@ async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, pr
       const link    = usefulLinks[m.i];
       const product = m.catalog_id ? idToProduct[m.catalog_id] : null;
       return {
-        found:  { name: link.text, url: link.href.split('?')[0] },
+        found:  { name: link.text, url: link.href.split('?')[0], imageUrl: link.img || null },
         match:  product ? { product, confidence: m.confidence } : null,
         method: 'ai',
       };
@@ -234,10 +234,20 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
       logger.info('[Discovery] Using Claude AI for extraction + matching');
 
       const pageLinks = await page.evaluate(() =>
-        Array.from(document.querySelectorAll('a[href]')).map((a) => ({
-          text: (a.textContent || '').replace(/\s+/g, ' ').trim(),
-          href: a.href,
-        }))
+        Array.from(document.querySelectorAll('a[href]')).map((a) => {
+          // Try to find nearest image: inside the link, or in a parent card
+          const imgEl = a.querySelector('img') ||
+            a.closest('[class*="card"],[class*="product"],[class*="item"],[class*="result"]')?.querySelector('img');
+          const imgSrc = imgEl
+            ? (imgEl.getAttribute('data-src') || imgEl.getAttribute('data-lazy-src') ||
+               imgEl.getAttribute('data-original') || imgEl.src || null)
+            : null;
+          return {
+            text: (a.textContent || '').replace(/\s+/g, ' ').trim(),
+            href: a.href,
+            img:  imgSrc && imgSrc.startsWith('http') ? imgSrc : null,
+          };
+        })
       ).catch((err) => {
         logger.debug('[Discovery] page.evaluate failed (likely redirect/bot block)', { error: err.message });
         return [];
@@ -305,13 +315,15 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
 
 async function confirmMappings(companyId, mappings) {
   let added = 0;
-  for (const { product_id, url } of mappings) {
+  for (const { product_id, url, image_url } of mappings) {
     await query(
-      `INSERT INTO product_company_urls (product_id, company_id, product_url, is_active)
-       VALUES ($1, $2, $3, true)
+      `INSERT INTO product_company_urls (product_id, company_id, product_url, image_url, is_active)
+       VALUES ($1, $2, $3, $4, true)
        ON CONFLICT (product_id, company_id)
-       DO UPDATE SET product_url = EXCLUDED.product_url, is_active = true`,
-      [product_id, companyId, url]
+       DO UPDATE SET product_url = EXCLUDED.product_url,
+                     image_url   = COALESCE(EXCLUDED.image_url, product_company_urls.image_url),
+                     is_active   = true`,
+      [product_id, companyId, url, image_url || null]
     );
     added++;
   }

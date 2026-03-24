@@ -219,7 +219,7 @@ export function DiscoverModal({ open, onClose, companies, products, onAdded }: D
 
   const handleConfirm = async () => {
     // Group mappings by companyId
-    const byCompany = new Map<number, Array<{ product_id: number; url: string }>>();
+    const byCompany = new Map<number, Array<{ product_id: number; url: string; image_url?: string | null }>>();
 
     checked.forEach((i) => {
       const result = results[i];
@@ -228,7 +228,7 @@ export function DiscoverModal({ open, onClose, companies, products, onAdded }: D
       const productId  = overrideId !== undefined ? overrideId : (result.match?.product?.id ?? null);
       if (productId !== null && result.found.url) {
         if (!byCompany.has(result.companyId)) byCompany.set(result.companyId, []);
-        byCompany.get(result.companyId)!.push({ product_id: productId, url: result.found.url });
+        byCompany.get(result.companyId)!.push({ product_id: productId, url: result.found.url, image_url: result.found.imageUrl ?? null });
       }
     });
 

@@ -237,7 +237,7 @@ export const scraperApi = {
 // ── Auto-Discover ─────────────────────────────────────────────────
 
 export interface DiscoveryMatch {
-  found: { name: string; url: string };
+  found: { name: string; url: string; imageUrl?: string | null };
   match: { product: Product; confidence: number } | null;
   method: 'ai' | 'fuzzy';
   already_tracked: boolean;
@@ -253,6 +253,6 @@ export interface DiscoveryResult {
 export const discoveryApi = {
   search: (companyId: number, query: string) =>
     api.post<ApiResponse<DiscoveryResult>>('/api/discovery/search', { company_id: companyId, query }),
-  confirm: (companyId: number, mappings: Array<{ product_id: number; url: string }>) =>
+  confirm: (companyId: number, mappings: Array<{ product_id: number; url: string; image_url?: string | null }>) =>
     api.post<ApiResponse<{ added: number }>>('/api/discovery/confirm', { company_id: companyId, mappings }),
 };
