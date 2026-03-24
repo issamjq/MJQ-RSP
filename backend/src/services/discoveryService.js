@@ -30,7 +30,7 @@ const logger             = require('../utils/logger');
  * @param {RegExp|null} productUrlPattern - If set, only links matching this pattern are sent
  * @returns {Promise<Array<{found: object, match: object|null, method: string}>>}
  */
-async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, productUrlPattern) {
+async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, productUrlPattern, screenshotBase64 = null) {
   // Build compact catalog string
   const catalogText = catalog
     .map((p) => `${p.id}: ${p.internal_name}`)
@@ -75,6 +75,21 @@ async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, pr
     `- "confidence" = 0.0–1.0, only include entries ≥ 0.75\n` +
     `- One link matches at most one catalog entry`;
 
+  // Build message content — include screenshot if available for visual verification
+  const messageContent = screenshotBase64
+    ? [
+        {
+          type:   'image',
+          source: { type: 'base64', media_type: 'image/jpeg', data: screenshotBase64 },
+        },
+        {
+          type: 'text',
+          text: `The image above is a screenshot of the ${companyName} search results page.\n` +
+                `Use it to visually verify product names, sizes, and variants before matching.\n\n` + prompt,
+        },
+      ]
+    : prompt;
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method:  'POST',
     headers: {
@@ -85,7 +100,7 @@ async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, pr
     body: JSON.stringify({
       model:      'claude-haiku-4-5-20251001',
       max_tokens: 2048,
-      messages:   [{ role: 'user', content: prompt }],
+      messages:   [{ role: 'user', content: messageContent }],
     }),
   });
 
@@ -263,7 +278,16 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
       if (preFiltered.length === 0) {
         logger.info('[Discovery] No product links matched pattern — skipping Claude call', { company: company.name });
       } else {
-        matchResults = await claudeExtractAndMatch(pageLinks, catalog, apiKey, company.name, pattern);
+        // Take a screenshot so Claude Vision can visually verify product names/sizes
+        const screenshotBase64 = await page.screenshot({ type: 'jpeg', quality: 70, fullPage: false })
+          .then(buf => buf.toString('base64'))
+          .catch(() => null);
+
+        if (screenshotBase64) {
+          logger.info('[Discovery] Screenshot captured for Vision-assisted matching');
+        }
+
+        matchResults = await claudeExtractAndMatch(pageLinks, catalog, apiKey, company.name, pattern, screenshotBase64);
       }
 
     } else {
