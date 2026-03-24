@@ -45,7 +45,7 @@ export default function App() {
     return savedState === "true";
   });
   
-  const [activePage, setActivePage] = useState<Page>("dashboard");
+  const [activePage, setActivePage] = useState<Page>("monitor-dashboard");
   const [dateRange, setDateRange] = useState<DateRange>("7days");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
     "Boutique Alice",

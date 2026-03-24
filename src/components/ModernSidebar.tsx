@@ -43,7 +43,10 @@ export function ModernSidebar({
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   // Define navigation sections
+  // NOTE: other sections (accounts, core, operations, listings, tracking) are kept
+  // in code but hidden from the UI — they will be re-enabled later.
   const sections: NavSection[] = [
+    /*
     {
       title: t(language, "nav.section.accounts"),
       items: [
@@ -82,6 +85,7 @@ export function ModernSidebar({
         { id: "tracking-public" as Page, icon: Globe, label: language === "fr" ? "Publiques" : "Public" },
       ]
     },
+    */
     {
       title: "Price Monitor",
       items: [

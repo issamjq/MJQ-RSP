@@ -57,16 +57,13 @@ export function ModernTopbar({
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div 
-              className="flex items-center justify-center w-9 h-9 rounded-xl text-white font-bold text-base shadow-lg"
-              style={{
-                background: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
-                boxShadow: "0 0 15px rgba(139, 92, 246, 0.4)"
-              }}
-            >
-              V
-            </div>
-            <span className="text-base font-semibold dark:text-foreground text-foreground">Vintsy</span>
+            <svg width="38" height="38" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="38" height="38" rx="12" fill="#ffffff"/>
+              <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff" style={{filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.12))"}}/>
+              <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
+              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
+              <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
+            </svg>
           </div>
 
           {/* Right: Actions */}
