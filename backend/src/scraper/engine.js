@@ -179,6 +179,10 @@ class ScraperEngine {
         const noon = document.querySelector('[class*="image-ratio"] img, [class*="ProductImage"] img, [data-qa="product-image"] img');
         if (noon && src(noon)) return src(noon);
 
+        // Talabat (dhmedia CDN)
+        const tal = document.querySelector('img[src*="dhmedia"], img[src*="talabat"], [class*="swiper"] img, [class*="product-image"] img, [class*="itemImage"] img');
+        if (tal && src(tal) && src(tal).startsWith('http')) return src(tal);
+
         // Chemist Warehouse / generic Magento/WooCommerce
         const gen = document.querySelector('.woocommerce-product-gallery__image img, .MagicZoomPlus img, .fotorama__img, [class*="product-image"] img');
         if (gen && src(gen)) return src(gen);
