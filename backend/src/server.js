@@ -8,6 +8,21 @@ const { pool } = require('./db');
 
 const PORT = parseInt(process.env.PORT) || 4000;
 
+async function runMigrations() {
+  const migrations = [
+    // Add original_price column for discount tracking
+    `ALTER TABLE price_snapshots ADD COLUMN IF NOT EXISTS original_price NUMERIC(12,2)`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await pool.query(sql);
+      logger.info('Migration OK', { sql: sql.slice(0, 60) });
+    } catch (err) {
+      logger.warn('Migration skipped/failed', { error: err.message });
+    }
+  }
+}
+
 async function start() {
   // Verify DB connection on startup
   try {
@@ -17,6 +32,9 @@ async function start() {
     logger.error('Database connection FAILED', { error: err.message });
     process.exit(1);
   }
+
+  // Run auto-migrations
+  await runMigrations();
 
   const server = app.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`, {

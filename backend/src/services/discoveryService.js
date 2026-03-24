@@ -197,19 +197,30 @@ async function claudeExtractAndMatch(pageLinks, catalog, apiKey, companyName, pr
     `Internal catalog (id: name):\n${catalogText}\n\n` +
     `Product links found on the page (index: "text" → URL):${patternHint}\n${linksText}\n\n` +
     `Your task: Match each product link to the correct catalog entry.\n\n` +
-    `STRICT MATCHING RULES — read carefully:\n` +
-    `1. SIZE/VOLUME MUST MATCH EXACTLY: 25ml ≠ 75ml ≠ 85ml ≠ 100ml. Never match different sizes.\n` +
-    `2. FLAVOR/VARIANT MUST MATCH: "Classic" ≠ "Whitening" ≠ "Ginger". Same brand, different flavor = no match.\n` +
-    `3. PRODUCT TYPE MUST MATCH: Toothpaste ≠ Mouthwash ≠ Toothbrush.\n` +
-    `4. Ignore minor formatting: "75ml" = "75 mL" = "75ML", word order differences, extra words like "Toothpaste".\n` +
-    `5. If a catalog entry has "75ml" and the link has "85ml" or no size info — set confidence below 0.6.\n` +
-    `6. When in doubt, do NOT match (null). A missed match is better than a wrong match.\n\n` +
-    `Return ONLY a JSON array:\n` +
+    `━━━ STRICT MATCHING RULES ━━━\n\n` +
+    `SIZE/VOLUME — must be identical after unit conversion:\n` +
+    `  • ml matches: 75ml = 75mL = 75 ml = 2.5oz = 2.5 fl oz\n` +
+    `  • oz→ml reference: 0.85oz≈25ml | 2.5oz≈75ml | 2.8oz≈85ml | 3.4oz≈100ml | 4.2oz≈125ml | 4.5oz≈133ml\n` +
+    `  • "4.5 oz" does NOT match "75ml" (133ml ≠ 75ml) — this is a disqualifying mismatch\n` +
+    `  • "85ml" does NOT match "75ml" — this is a disqualifying mismatch\n` +
+    `  • If size is absent in the link text, check the URL path (e.g. "75ml" or "75-ml" in slug)\n` +
+    `  • If size cannot be confirmed from text OR URL → set confidence ≤ 0.55 (do not include)\n\n` +
+    `FLAVOR/VARIANT — must be identical:\n` +
+    `  • "Classic" ≠ "Whitening" ≠ "Amarelli Licorice" ≠ "Aquatic Mint" ≠ "Ginger"\n` +
+    `  • Same brand + different flavour = NO match\n\n` +
+    `PRODUCT TYPE — must match:\n` +
+    `  • Toothpaste ≠ Mouthwash ≠ Toothbrush ≠ Whitening Kit\n\n` +
+    `CONFIDENCE THRESHOLDS:\n` +
+    `  • 0.93–1.0: brand + flavour + size all confirmed identical\n` +
+    `  • 0.85–0.92: brand + flavour confirmed, size inferred from URL (not text)\n` +
+    `  • < 0.85: any uncertainty about size or flavour → DO NOT INCLUDE\n\n` +
+    `GOLDEN RULE: A missed match is far better than a wrong match. If you are not ≥85% sure, output null.\n\n` +
+    `Return ONLY a JSON array (no explanation, no markdown):\n` +
     `[{"i": 0, "catalog_id": 5, "confidence": 0.95}]\n\n` +
     `- "i" = link index\n` +
-    `- "catalog_id" = internal product id (null if no confident match)\n` +
-    `- "confidence" = 0.0–1.0, only include entries ≥ 0.75\n` +
-    `- One link matches at most one catalog entry`;
+    `- "catalog_id" = internal product id (null if no match)\n` +
+    `- "confidence" = 0.0–1.0, only include entries where confidence ≥ 0.85\n` +
+    `- One link maps to at most one catalog entry; one catalog entry maps to at most one link`;
 
   // Build message content — include screenshot if available for visual verification
   const messageContent = screenshotBase64
