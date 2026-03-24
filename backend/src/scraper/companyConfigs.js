@@ -187,6 +187,58 @@ const configs = {
     blockResources: ['image', 'font'],
   },
 
+  // Bin Sina — Magento
+  'bin-sina': {
+    priceSelectors: [
+      '.price-box .price',
+      '[data-price-type="finalPrice"] .price',
+      '.special-price .price',
+      '.regular-price .price',
+      '[itemprop="price"]',
+    ],
+    titleSelectors: [
+      'h1.page-title span',
+      'h1.product-name',
+      'h1[itemprop="name"]',
+      'h1',
+    ],
+    availabilitySelectors: [
+      '.stock.available',
+      '.stock.unavailable',
+      '[title="In stock"]',
+      '[title="Out of stock"]',
+    ],
+    waitForSelector: 'h1',
+    pageOptions: { waitUntil: 'networkidle', timeout: 40000 },
+    currency: 'AED',
+    blockResources: ['image', 'font', 'media'],
+  },
+
+  // Med7 Online — Shopify
+  'med7': {
+    priceSelectors: [
+      '.price__current',
+      '.product__price',
+      '[data-product-price]',
+      '.price-item--sale',
+      '.price-item--regular',
+    ],
+    titleSelectors: [
+      'h1.product__title',
+      'h1.product-single__title',
+      'h1',
+    ],
+    availabilitySelectors: [
+      '[data-add-to-cart]',
+      '.product-form__cart-submit',
+      '[class*="sold-out"]',
+    ],
+    waitForSelector: 'h1',
+    pageOptions: { waitUntil: 'domcontentloaded', timeout: 30000 },
+    currency: 'AED',
+    blockResources: ['image', 'font', 'media'],
+  },
+
   'life-pharmacy': {
     priceSelectors: [
       '[class*="price"] span',

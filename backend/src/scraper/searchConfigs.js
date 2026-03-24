@@ -174,13 +174,14 @@ const searchConfigs = {
     },
   },
 
-  // Grandiose UAE — similar to Carrefour (SAP Hybris/Next.js)
+  // Grandiose UAE — Magento + Klevu search (correct URL: /search/?q=)
+  // NOTE: Does not carry Marvis products as of discovery.
   'grandiose': {
-    searchUrl:        'https://www.grandiose.ae/en/search?q={query}',
-    pageOptions:      { waitUntil: 'domcontentloaded', timeout: 30000 },
+    searchUrl:        'https://www.grandiose.ae/search/?q={query}',
+    pageOptions:      { waitUntil: 'networkidle', timeout: 40000 },
     blockResources:   ['image', 'font', 'media'],
-    waitForSelector:  'a[href*="/p/"], a[href*="/product/"]',
-    productUrlPattern: /\/p\/\d+|\/product\//,
+    waitForSelector:  null,
+    productUrlPattern: /grandiose\.ae\/[a-z0-9-]+\.html/,
 
     async extractProducts(page) {
       return page.evaluate(() => {
@@ -189,7 +190,8 @@ const searchConfigs = {
         const results = [];
         for (const a of anchors) {
           const href = a.href || '';
-          if (!href.match(/\/p\/\d+|\/product\//)) continue;
+          if (!href.match(/grandiose\.ae\/[a-z0-9-]+\.html/)) continue;
+          if (href.includes('/catalogsearch') || href.includes('/customer') || href.includes('/checkout')) continue;
           const url = href.split('?')[0];
           if (!url || seen.has(url)) continue;
           seen.add(url);
@@ -226,22 +228,48 @@ const searchConfigs = {
     },
   },
 
-  // Bin Sina Pharmacy UAE
+  // Bin Sina Pharmacy UAE — Magento, product URLs: /en/buy-{slug}.html
   'bin-sina': {
-    searchUrl:        'https://www.binsina.ae/search?q={query}',
-    pageOptions:      { waitUntil: 'domcontentloaded', timeout: 30000 },
+    searchUrl:        'https://www.binsina.ae/en/catalogsearch/result/?q={query}',
+    pageOptions:      { waitUntil: 'networkidle', timeout: 40000 },
     blockResources:   ['image', 'font', 'media'],
-    waitForSelector:  'a[href*="/products/"], a[href*="/product/"]',
-    productUrlPattern: /binsina\.ae\/(products|product)\//,
+    waitForSelector:  'a[href*="/buy-"]',
+    productUrlPattern: /binsina\.ae\/en\/buy-[^/]+\.html/,
     async extractProducts(page) {
       return page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a[href*="/product"]'));
+        const anchors = Array.from(document.querySelectorAll('a[href*="/buy-"]'));
         const seen = new Set(); const results = [];
         for (const a of anchors) {
-          const url = (a.href || '').split('?')[0];
+          const href = a.href || '';
+          if (!href.match(/binsina\.ae\/en\/buy-[^/]+\.html/)) continue;
+          const url = href.split('?')[0];
           if (!url || seen.has(url)) continue; seen.add(url);
           const name = a.textContent.replace(/\s+/g, ' ').trim();
-          if (name && url) results.push({ name, url });
+          if (name.length > 3 && url) results.push({ name, url });
+        }
+        return results;
+      });
+    },
+  },
+
+  // Med7 Online UAE — Shopify, server-rendered
+  'med7': {
+    searchUrl:        'https://www.med7online.com/search?q={query}',
+    pageOptions:      { waitUntil: 'domcontentloaded', timeout: 30000 },
+    blockResources:   ['image', 'font', 'media'],
+    waitForSelector:  'a[href*="/products/"]',
+    productUrlPattern: /med7online\.com\/.*\/products\//,
+    async extractProducts(page) {
+      return page.evaluate(() => {
+        const anchors = Array.from(document.querySelectorAll('a[href*="/products/"]'));
+        const seen = new Set(); const results = [];
+        for (const a of anchors) {
+          const href = a.href || '';
+          if (!href.includes('med7online.com')) continue;
+          const url = href.split('?')[0];
+          if (!url || seen.has(url)) continue; seen.add(url);
+          const name = a.textContent.replace(/\s+/g, ' ').trim();
+          if (name.length > 3 && url) results.push({ name, url });
         }
         return results;
       });
