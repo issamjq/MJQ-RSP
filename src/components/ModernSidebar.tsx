@@ -13,6 +13,8 @@ interface ModernSidebarProps {
   onGlobalRefresh?: () => Promise<void>;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 }
 
 interface NavItem {
@@ -27,13 +29,15 @@ interface NavSection {
   items: NavItem[];
 }
 
-export function ModernSidebar({ 
-  activePage, 
-  onPageChange, 
-  language, 
+export function ModernSidebar({
+  activePage,
+  onPageChange,
+  language,
   onGlobalRefresh,
   collapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  mobileOpen,
+  onMobileClose,
 }: ModernSidebarProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -134,7 +138,7 @@ export function ModernSidebar({
               ? "dark:bg-primary/15 bg-primary/10 dark:text-primary text-primary border dark:border-primary/40 border-primary/30"
               : "dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground dark:hover:bg-surface-hover hover:bg-muted/50 dark:hover:border-primary/20 hover:border-primary/10 border border-transparent"
           }`}
-          onClick={() => onPageChange(item.id)}
+          onClick={() => { onPageChange(item.id); onMobileClose(); }}
         >
           <Icon className="h-5 w-5" />
           {item.badge && item.badge > 0 && (
@@ -155,7 +159,7 @@ export function ModernSidebar({
             ? "dark:bg-primary/15 bg-primary/10 dark:text-primary text-primary border dark:border-primary/40 border-primary/30"
             : "dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground dark:hover:bg-surface-hover hover:bg-muted/50"
         }`}
-        onClick={() => onPageChange(item.id)}
+        onClick={() => { onPageChange(item.id); onMobileClose(); }}
       >
         <Icon className="h-5 w-5 shrink-0" />
         <span className="flex-1 text-left truncate">{item.label}</span>
@@ -169,13 +173,20 @@ export function ModernSidebar({
   };
 
   return (
-    <div 
-      className={`fixed left-0 top-0 h-screen z-40 flex flex-col transition-all duration-300 border-r border-border ${
-        collapsed ? "w-[72px]" : "w-[240px]"
-      } dark:bg-gradient-to-b dark:from-[#0E0E18] dark:to-[#0A0A0F] bg-gradient-to-b from-[#fafafa] to-[#f5f5f5]`}
-      style={{
-        boxShadow: "2px 0 24px rgba(0, 0, 0, 0.08)"
-      }}
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+    <div
+      className={`fixed left-0 top-0 h-screen z-50 flex flex-col transition-all duration-300 border-r border-border
+        ${collapsed ? "w-[72px]" : "w-[240px]"}
+        ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0
+        dark:bg-gradient-to-b dark:from-[#0E0E18] dark:to-[#0A0A0F] bg-gradient-to-b from-[#fafafa] to-[#f5f5f5]`}
+      style={{ boxShadow: "2px 0 24px rgba(0, 0, 0, 0.08)" }}
     >
       {/* Empty header section - logo moved to topbar - no harsh divider */}
       <div className="h-16"></div>
@@ -245,5 +256,6 @@ export function ModernSidebar({
         </Button>
       </div>
     </div>
+    </>
   );
 }

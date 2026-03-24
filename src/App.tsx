@@ -39,6 +39,7 @@ export default function App() {
   });
   
   // Load sidebar collapsed state from localStorage or default to false (expanded)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     const savedState = localStorage.getItem("sidebarCollapsed");
     return savedState === "true";
@@ -89,17 +90,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ModernSidebar 
-        activePage={activePage} 
-        onPageChange={setActivePage} 
+      <ModernSidebar
+        activePage={activePage}
+        onPageChange={setActivePage}
         language={language}
         onGlobalRefresh={handleGlobalRefresh}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
-      
-      <ModernTopbar 
-        theme={theme} 
+
+      <ModernTopbar
+        theme={theme}
         language={language}
         onThemeChange={handleThemeToggle}
         onLanguageChange={setLanguage}
@@ -109,13 +112,14 @@ export default function App() {
           setActivePage("settings");
         }}
         sidebarCollapsed={sidebarCollapsed}
+        onMobileMenuToggle={() => setMobileSidebarOpen(o => !o)}
       />
       
       <Toaster theme={theme} position="top-right" richColors />
       
-      <div 
-        className={`transition-all duration-300 ${
-          sidebarCollapsed ? "ml-[72px]" : "ml-[240px]"
+      <div
+        className={`transition-all duration-300 ml-0 ${
+          sidebarCollapsed ? "md:ml-[72px]" : "md:ml-[240px]"
         }`}
       >
         {/* Full-height pages with proper wrapper */}

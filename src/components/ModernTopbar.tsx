@@ -1,4 +1,4 @@
-import { Settings, Globe, Moon, Sun, User, LogOut } from "lucide-react";
+import { Settings, Globe, Moon, Sun, User, LogOut, Menu } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
@@ -21,32 +21,42 @@ interface ModernTopbarProps {
   onNavigateToSettings?: () => void;
   onNavigateToSubscription?: () => void;
   sidebarCollapsed: boolean;
+  onMobileMenuToggle: () => void;
 }
 
-export function ModernTopbar({ 
-  theme, 
-  language, 
-  onThemeChange, 
+export function ModernTopbar({
+  theme,
+  language,
+  onThemeChange,
   onLanguageChange,
   onNavigateToSettings,
   onNavigateToSubscription,
-  sidebarCollapsed
+  sidebarCollapsed,
+  onMobileMenuToggle,
 }: ModernTopbarProps) {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   return (
     <>
-      <div 
-        className={`fixed top-0 right-0 h-16 z-30 transition-all duration-300 border-b border-border backdrop-blur-xl ${
+      <div
+        className={`fixed top-0 right-0 h-16 z-30 transition-all duration-300 border-b border-border backdrop-blur-xl left-0 md:${
           sidebarCollapsed ? "left-[72px]" : "left-[240px]"
         } dark:bg-gradient-to-r dark:from-[#12121C]/95 dark:to-[#0E0E18]/90 bg-gradient-to-r from-white/95 to-[#fafafa]/90`}
         style={{
           boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)"
         }}
       >
-        <div className="h-full px-6 flex items-center justify-between gap-6">
-          {/* Left: Logo */}
+        <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6">
+          {/* Left: Hamburger (mobile) + Logo */}
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-9 w-9 rounded-xl"
+              onClick={onMobileMenuToggle}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
             <div 
               className="flex items-center justify-center w-9 h-9 rounded-xl text-white font-bold text-base shadow-lg"
               style={{
