@@ -22,7 +22,7 @@ async function getAll(query = {}) {
   }
   if (query.search) {
     params.push(`%${query.search}%`);
-    filters.push(`(p.internal_name ILIKE $${params.length} OR p.internal_sku ILIKE $${params.length} OR p.barcode ILIKE $${params.length})`);
+    filters.push(`(p.internal_name ILIKE $${params.length} OR p.internal_sku ILIKE $${params.length} OR p.barcode ILIKE $${params.length} OR p.brand ILIKE $${params.length})`);
   }
 
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
