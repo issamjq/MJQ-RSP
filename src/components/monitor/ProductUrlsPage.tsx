@@ -362,8 +362,8 @@ export function ProductUrlsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1.5">
-                        <Button variant="ghost" size="icon" title="Scrape this URL"
-                          disabled={scraping === u.id}
+                        <Button variant="ghost" size="icon" title={scraping !== null && scraping !== u.id ? "Wait for current scrape to finish" : "Scrape this URL"}
+                          disabled={scraping !== null}
                           onClick={() => handleScrapeOne(u)}
                           className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-primary hover:text-primary">
                           <Play className={`h-3.5 w-3.5 ${scraping === u.id ? "animate-pulse" : ""}`} />

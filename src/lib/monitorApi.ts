@@ -213,6 +213,9 @@ export const snapshotsApi = {
       company_id: companyId,
       days,
     }),
+
+  delete: (id: number) =>
+    api.del<{ success: boolean; message: string }>(`/api/price-snapshots/${id}`),
 };
 
 // ── Sync Runs ─────────────────────────────────────────────────────

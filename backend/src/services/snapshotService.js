@@ -162,4 +162,15 @@ async function getPriceHistory(productId, companyId, days = 30) {
   return rows;
 }
 
-module.exports = { create, getAll, getLatestPrices, getPriceHistory };
+/**
+ * Delete a snapshot by ID.
+ */
+async function remove(id) {
+  const { rows } = await db.query(
+    `DELETE FROM price_snapshots WHERE id = $1 RETURNING id`,
+    [parseInt(id)]
+  );
+  return rows[0] || null;
+}
+
+module.exports = { create, getAll, getLatestPrices, getPriceHistory, remove };

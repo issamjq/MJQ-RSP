@@ -12,4 +12,7 @@ router.get('/latest',   ctrl.getLatest);
 // GET /api/price-snapshots/history?product_id=&company_id=&days=30
 router.get('/history',  ctrl.getHistory);
 
+// DELETE /api/price-snapshots/:id
+router.delete('/:id',   ctrl.remove);
+
 module.exports = router;

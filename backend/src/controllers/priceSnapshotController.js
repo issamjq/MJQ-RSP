@@ -34,4 +34,14 @@ async function getHistory(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getLatest, getHistory };
+async function remove(req, res, next) {
+  try {
+    const deleted = await snapshotService.remove(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: { message: 'Snapshot not found', code: 'NOT_FOUND' } });
+    }
+    res.json({ success: true, message: 'Snapshot deleted' });
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, getLatest, getHistory, remove };
