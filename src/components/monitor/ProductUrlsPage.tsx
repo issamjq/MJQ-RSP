@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link2, Plus, RefreshCw, Pencil, Trash2, Play, ExternalLink, Check, X, Sparkles } from "lucide-react";
+import { Link2, Plus, RefreshCw, Pencil, Trash2, Play, ExternalLink, Check, X, Sparkles, PlayCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner@2.0.3";
@@ -185,6 +185,8 @@ export function ProductUrlsPage() {
   const [formOpen, setFormOpen]   = useState(false);
   const [editTarget, setEditTarget] = useState<ProductCompanyUrl | undefined>();
   const [scraping, setScraping]   = useState<number | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [selected, setSelected]   = useState<Set<number>>(new Set());
   const [discoverOpen, setDiscoverOpen] = useState(false);
 
   const LIMIT = 25;
@@ -218,7 +220,7 @@ export function ProductUrlsPage() {
 
   useEffect(() => { loadRefs(); }, [loadRefs]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [filterCompany]);
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [filterCompany]);
 
   const handleDelete = async (u: ProductCompanyUrl) => {
     if (!confirm(`Remove ${u.internal_name} → ${u.company_name} mapping?`)) return;
@@ -251,6 +253,48 @@ export function ProductUrlsPage() {
     }
   };
 
+  const handleScrapeSelected = async () => {
+    if (selected.size === 0) return;
+    setBulkRunning(true);
+    try {
+      await scraperApi.runMany(Array.from(selected));
+      toast.success(`Scraping ${selected.size} URL(s) started — check Sync Runs for progress`);
+      setSelected(new Set());
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to start scrape");
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
+  const handleScrapeAll = async () => {
+    setBulkRunning(true);
+    try {
+      await scraperApi.runAll();
+      toast.success("Scraping all URLs started — check Sync Runs for progress");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to start scrape");
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === urls.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(urls.map(u => u.id)));
+    }
+  };
+
   const openAdd  = () => { setEditTarget(undefined); setFormOpen(true); };
   const openEdit = (u: ProductCompanyUrl) => { setEditTarget(u); setFormOpen(true); };
 
@@ -273,7 +317,7 @@ export function ProductUrlsPage() {
             {total} URL mapping{total !== 1 ? "s" : ""} being monitored
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
             className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -282,6 +326,25 @@ export function ProductUrlsPage() {
             className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
             <Sparkles className="h-4 w-4" /> Auto-Discover
           </Button>
+
+          {/* Scrape Selected — only when items are checked */}
+          {selected.size > 0 && (
+            <Button size="sm" disabled={bulkRunning}
+              onClick={handleScrapeSelected}
+              className="rounded-xl gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Play className="h-4 w-4" />
+              Scrape {selected.size} selected
+            </Button>
+          )}
+
+          {/* Scrape All */}
+          <Button variant="outline" size="sm" disabled={bulkRunning || scraping !== null}
+            onClick={handleScrapeAll}
+            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            <PlayCircle className="h-4 w-4" />
+            {bulkRunning ? "Starting…" : "Scrape All"}
+          </Button>
+
           <Button size="sm" onClick={openAdd}
             className="rounded-xl gap-2 bg-primary hover:bg-primary/90 text-white">
             <Plus className="h-4 w-4" /> Add URL
@@ -304,6 +367,15 @@ export function ProductUrlsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b dark:border-white/5 border-border">
+                <th className="pl-4 pr-2 py-3.5 w-10">
+                  <input
+                    type="checkbox"
+                    checked={urls.length > 0 && selected.size === urls.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < urls.length; }}
+                    onChange={toggleSelectAll}
+                    className="rounded cursor-pointer accent-primary"
+                  />
+                </th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Product</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Company</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden lg:table-cell">URL</th>
@@ -315,15 +387,23 @@ export function ProductUrlsPage() {
             </thead>
             <tbody className="divide-y dark:divide-white/5 divide-border">
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">Loading…</td></tr>
               ) : urls.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">
+                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">
                   <Link2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
                   No URL mappings yet — add one to start tracking prices
                 </td></tr>
               ) : (
                 urls.map(u => (
-                  <tr key={u.id} className="dark:hover:bg-white/[0.02] hover:bg-muted/30 transition-colors">
+                  <tr key={u.id} className={`transition-colors ${selected.has(u.id) ? "dark:bg-primary/5 bg-primary/5" : "dark:hover:bg-white/[0.02] hover:bg-muted/30"}`}>
+                    <td className="pl-4 pr-2 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(u.id)}
+                        onChange={() => toggleSelect(u.id)}
+                        className="rounded cursor-pointer accent-primary"
+                      />
+                    </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         {u.image_url ? (

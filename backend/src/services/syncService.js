@@ -162,6 +162,25 @@ async function runCompany(companyId) {
 }
 
 /**
+ * Run scrapes for a specific set of URL IDs.
+ */
+async function runMany(urlIds) {
+  if (!urlIds || !urlIds.length) throw new Error('url_ids array is required');
+
+  const allUrls = await pcuService.getActiveUrls();
+  const urls = allUrls.filter(u => urlIds.includes(u.id));
+  if (!urls.length) throw new Error('No active URLs found for the given IDs');
+
+  const run = await createRun({
+    run_type:     'selected_batch',
+    triggered_by: 'api',
+    meta:         { url_ids: urlIds, url_count: urls.length },
+  });
+
+  return _executeBatch(run, urls);
+}
+
+/**
  * Run scrapes for ALL active URLs across all companies.
  */
 async function runAll() {
@@ -239,4 +258,4 @@ async function _executeBatch(run, urls) {
   return finalRun;
 }
 
-module.exports = { createRun, updateRun, getAll, getById, runOne, runCompany, runAll };
+module.exports = { createRun, updateRun, getAll, getById, runOne, runCompany, runMany, runAll };

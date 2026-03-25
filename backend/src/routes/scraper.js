@@ -11,6 +11,10 @@ router.post('/run-one',     ctrl.runOne);
 // Body: { company_id: number }
 router.post('/run-company', ctrl.runCompany);
 
+// Scrape a selected set of URL IDs (async)
+// Body: { url_ids: number[] }
+router.post('/run-many',    ctrl.runMany);
+
 // Scrape all active URLs across all companies (async)
 router.post('/run-all',     ctrl.runAll);
 

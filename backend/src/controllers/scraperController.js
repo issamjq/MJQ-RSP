@@ -73,6 +73,28 @@ async function runAll(req, res, next) {
 }
 
 /**
+ * POST /api/scraper/run-many
+ * Body: { url_ids: number[] }
+ *
+ * Scrapes a specific selection of URLs. Starts asynchronously.
+ */
+async function runMany(req, res, next) {
+  try {
+    const urlIds = req.body.url_ids;
+    if (!Array.isArray(urlIds) || urlIds.length === 0) {
+      return next(createError('url_ids array is required', 400, 'VALIDATION_ERROR'));
+    }
+    logger.info('[ScraperCtrl] runMany', { count: urlIds.length });
+
+    syncService.runMany(urlIds.map(Number)).catch((err) => {
+      logger.error('[ScraperCtrl] runMany background error', { error: err.message });
+    });
+
+    res.json({ success: true, message: `Scraping ${urlIds.length} URL(s) started.` });
+  } catch (err) { next(err); }
+}
+
+/**
  * POST /api/scraper/run-one-sync
  * Same as run-one but WAITS for the result (useful for single-item manual triggers).
  */
@@ -80,4 +102,4 @@ async function runOneSync(req, res, next) {
   return runOne(req, res, next);
 }
 
-module.exports = { runOne, runCompany, runAll, runOneSync };
+module.exports = { runOne, runCompany, runMany, runAll, runOneSync };

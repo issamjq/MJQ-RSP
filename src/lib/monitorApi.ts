@@ -246,6 +246,9 @@ export const scraperApi = {
   runCompany: (companyId: number) =>
     api.post<{ success: boolean; message: string }>("/api/scraper/run-company", { company_id: companyId }),
 
+  runMany: (urlIds: number[]) =>
+    api.post<{ success: boolean; message: string }>("/api/scraper/run-many", { url_ids: urlIds }),
+
   runAll: () =>
     api.post<{ success: boolean; message: string }>("/api/scraper/run-all"),
 };
