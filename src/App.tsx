@@ -27,19 +27,7 @@ import { SyncRunsPage } from "./components/monitor/SyncRunsPage";
 import { DateRange } from "./components/PageHeader";
 import { Language } from "./lib/i18n";
 
-export default function App() {
-  const { user, loading } = useAuth();
-
-  // Show nothing while Firebase checks session (avoids flash of login page)
-  if (loading) {
-    return <div className="min-h-screen bg-background" />;
-  }
-
-  // Not signed in → show login
-  if (!user) {
-    return <LoginPage />;
-  }
-
+function AppShell() {
   // Load theme from localStorage or default to dark
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -248,4 +236,20 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const { user, loading } = useAuth();
+
+  // Show nothing while Firebase checks session (avoids flash of login page)
+  if (loading) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  // Not signed in → show login
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <AppShell />;
 }

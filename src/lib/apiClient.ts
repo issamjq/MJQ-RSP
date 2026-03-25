@@ -34,9 +34,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 /** Get the current user's Firebase ID token (refreshes automatically if expired). */
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const user = auth.currentUser;
-  if (!user) return {};
   try {
+    await auth.authStateReady(); // wait for Firebase to restore session from storage
+    const user = auth.currentUser;
+    if (!user) return {};
     const token = await user.getIdToken();
     return { Authorization: `Bearer ${token}` };
   } catch {
