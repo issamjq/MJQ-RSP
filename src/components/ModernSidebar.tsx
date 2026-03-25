@@ -215,20 +215,6 @@ export function ModernSidebar({
         className={`px-3 py-4 mt-auto space-y-1.5 ${collapsed ? "flex flex-col items-center" : ""}`}
         style={{ borderTop: "1px solid rgba(110,118,255,0.08)" }}
       >
-        {/* Log out */}
-        <Button
-          variant="ghost"
-          size={collapsed ? "icon" : "default"}
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className={`${
-            collapsed ? "w-10 h-10" : "w-full justify-start h-9 gap-3"
-          } rounded-xl text-sm dark:text-muted-foreground text-muted-foreground dark:hover:text-red-400 hover:text-red-500 dark:hover:bg-red-500/8 hover:bg-red-50 border border-transparent transition-all duration-200`}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!collapsed && <span className="flex-1 text-left">{loggingOut ? "Signing out…" : "Log out"}</span>}
-        </Button>
-
         {/* Collapse toggle */}
         <Button
           variant="ghost"
@@ -244,6 +230,20 @@ export function ModernSidebar({
               <span className="flex-1 text-left">{t(language, "nav.collapse")}</span>
             </>
           )}
+        </Button>
+
+        {/* Log out */}
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "default"}
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className={`${
+            collapsed ? "w-10 h-10" : "w-full justify-start h-9 gap-3"
+          } rounded-xl text-sm dark:text-muted-foreground text-muted-foreground dark:hover:text-red-400 hover:text-red-500 dark:hover:bg-red-500/8 hover:bg-red-50 border border-transparent transition-all duration-200`}
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="flex-1 text-left">{loggingOut ? "Signing out…" : "Log out"}</span>}
         </Button>
 
         {/* Version badge */}
