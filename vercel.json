@@ -1,7 +1,5 @@
 {
-  "framework": null,
   "outputDirectory": "build",
-  "buildCommand": "echo 'skip build'",
-  "installCommand": "echo 'skip install'",
+  "buildCommand": "npm run build",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
