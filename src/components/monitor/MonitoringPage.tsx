@@ -5,8 +5,8 @@ import { SyncRunsPage } from "./SyncRunsPage";
 
 type SubTab = "urls" | "prices" | "syncs";
 
-export function MonitoringPage() {
-  const [tab, setTab] = useState<SubTab>("urls");
+export function MonitoringPage({ initialTab = "urls" }: { initialTab?: SubTab }) {
+  const [tab, setTab] = useState<SubTab>(initialTab);
 
   const tabBtnCls = (active: boolean) =>
     `px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${

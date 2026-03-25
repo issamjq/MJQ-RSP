@@ -56,6 +56,7 @@ function AppShell() {
     "Margo Vintage",
   ]);
   const [settingsTab, setSettingsTab] = useState<"profile" | "security" | "preferences" | "employee" | "subscription">("profile");
+  const [monitoringTab, setMonitoringTab] = useState<"urls" | "prices" | "syncs">("urls");
 
   // Persist active page to localStorage
   useEffect(() => {
@@ -222,10 +223,15 @@ function AppShell() {
                 <TrackingPublicPage language={language} />
               )}
 
-              {activePage === "monitor-dashboard"  && <MonitorDashboard />}
+              {activePage === "monitor-dashboard"  && (
+                <MonitorDashboard onNavigate={(page, subTab) => {
+                  if (subTab) setMonitoringTab(subTab as "urls" | "prices" | "syncs");
+                  setActivePage(page);
+                }} />
+              )}
               {activePage === "monitor-companies"  && <CompaniesPage />}
               {activePage === "monitor-products"   && <ProductsPage />}
-              {activePage === "monitor-monitoring" && <MonitoringPage />}
+              {activePage === "monitor-monitoring" && <MonitoringPage initialTab={monitoringTab} />}
             </div>
           </main>
         )}
