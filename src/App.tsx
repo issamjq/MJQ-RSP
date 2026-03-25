@@ -103,7 +103,6 @@ function AppShell() {
         activePage={activePage}
         onPageChange={setActivePage}
         language={language}
-        onGlobalRefresh={handleGlobalRefresh}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
         mobileOpen={mobileSidebarOpen}

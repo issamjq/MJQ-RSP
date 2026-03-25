@@ -1,8 +1,9 @@
-import { ChartLine, Bell, MessageSquare, Play, Package, Megaphone, LayoutGrid, Shirt, RotateCw, ChevronLeft, ChevronRight, Wallet, ShoppingBag, BarChart3, TrendingUp, Users, Globe, ShieldCheck, Building2, BarChart2 } from "lucide-react";
+import { ChartLine, Bell, MessageSquare, Play, Package, Megaphone, LayoutGrid, Shirt, ChevronLeft, ChevronRight, Wallet, ShoppingBag, TrendingUp, Users, Globe, ShieldCheck, Building2, BarChart2, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Language, t } from "../lib/i18n";
-import { toast } from "sonner@2.0.3";
+import { logout } from "../lib/firebase";
+import { APP_VERSION } from "../lib/version";
 
 export type Page = "dashboard" | "orders" | "purchases" | "wallet" | "notifications" | "messages" | "launcher" | "stock" | "publisher" | "published" | "settings" | "tracking-products" | "tracking-vendors" | "tracking-public" | "monitor-dashboard" | "monitor-companies" | "monitor-products" | "monitor-monitoring";
 
@@ -10,7 +11,6 @@ interface ModernSidebarProps {
   activePage: Page;
   onPageChange: (page: Page) => void;
   language: Language;
-  onGlobalRefresh?: () => Promise<void>;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
@@ -33,14 +33,12 @@ export function ModernSidebar({
   activePage,
   onPageChange,
   language,
-  onGlobalRefresh,
   collapsed,
   onToggleCollapse,
   mobileOpen,
   onMobileClose,
 }: ModernSidebarProps) {
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Define navigation sections
   // NOTE: other sections (accounts, core, operations, listings, tracking) are kept
@@ -97,32 +95,9 @@ export function ModernSidebar({
     },
   ];
 
-  const handleGlobalRefresh = async () => {
-    if (isRefreshing || cooldownRemaining > 0 || !onGlobalRefresh) return;
-    
-    setIsRefreshing(true);
-    
-    try {
-      await onGlobalRefresh();
-      toast.success(t(language, "globalRefresh.toastDone"));
-      
-      const cooldownDuration = 5000;
-      const cooldownStep = 100;
-      let remaining = cooldownDuration;
-      
-      const cooldownInterval = setInterval(() => {
-        remaining -= cooldownStep;
-        setCooldownRemaining(Math.max(0, remaining));
-        
-        if (remaining <= 0) {
-          clearInterval(cooldownInterval);
-        }
-      }, cooldownStep);
-    } catch (error) {
-      toast.error(t(language, "globalRefresh.toastError"));
-    } finally {
-      setIsRefreshing(false);
-    }
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try { await logout(); } finally { setLoggingOut(false); }
   };
 
   const renderNavItem = (item: NavItem) => {
@@ -235,51 +210,51 @@ export function ModernSidebar({
         ))}
       </div>
 
-      {/* Bottom Actions - no harsh divider */}
-      <div 
-        className={`px-3 py-4 mt-auto space-y-2 ${
-          collapsed ? "flex flex-col items-center" : ""
-        }`}
-        style={{
-          borderTop: "1px solid rgba(110, 118, 255, 0.1)"
-        }}
+      {/* Bottom: Logout + version */}
+      <div
+        className={`px-3 py-4 mt-auto space-y-1.5 ${collapsed ? "flex flex-col items-center" : ""}`}
+        style={{ borderTop: "1px solid rgba(110,118,255,0.08)" }}
       >
-        {/* Global Refresh */}
-        {onGlobalRefresh && (
-          <Button
-            variant="ghost"
-            size={collapsed ? "icon" : "default"}
-            onClick={handleGlobalRefresh}
-            disabled={isRefreshing || cooldownRemaining > 0}
-            className={`${
-              collapsed ? "w-11 h-11" : "w-full justify-start h-11 gap-3"
-            } rounded-xl dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground dark:hover:bg-surface-hover hover:bg-muted/50 dark:hover:border-primary/20 hover:border-primary/10 border border-transparent transition-all duration-200 ${
-              (isRefreshing || cooldownRemaining > 0) ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            <RotateCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""} ${collapsed ? "" : "shrink-0"}`} />
-            {!collapsed && <span className="flex-1 text-left">{t(language, "globalRefresh.tooltip")}</span>}
-          </Button>
-        )}
+        {/* Log out */}
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "default"}
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className={`${
+            collapsed ? "w-10 h-10" : "w-full justify-start h-9 gap-3"
+          } rounded-xl text-sm dark:text-muted-foreground text-muted-foreground dark:hover:text-red-400 hover:text-red-500 dark:hover:bg-red-500/8 hover:bg-red-50 border border-transparent transition-all duration-200`}
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="flex-1 text-left">{loggingOut ? "Signing out…" : "Log out"}</span>}
+        </Button>
 
-        {/* Collapse/Expand Toggle - Same style as Refresh button */}
+        {/* Collapse toggle */}
         <Button
           variant="ghost"
           size={collapsed ? "icon" : "default"}
           onClick={onToggleCollapse}
           className={`${
-            collapsed ? "w-11 h-11" : "w-full justify-start h-11 gap-3"
-          } rounded-xl dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground dark:hover:bg-surface-hover hover:bg-muted/50 dark:hover:border-primary/20 hover:border-primary/10 border border-transparent transition-all duration-200`}
+            collapsed ? "w-10 h-10" : "w-full justify-start h-9 gap-3"
+          } rounded-xl text-sm dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground dark:hover:bg-surface-hover hover:bg-muted/50 border border-transparent transition-all duration-200`}
         >
-          {collapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : (
             <>
-              <ChevronLeft className="h-5 w-5 shrink-0" />
+              <ChevronLeft className="h-4 w-4 shrink-0" />
               <span className="flex-1 text-left">{t(language, "nav.collapse")}</span>
             </>
           )}
         </Button>
+
+        {/* Version badge */}
+        {!collapsed && (
+          <div className="pt-1 px-1">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium dark:text-muted-foreground/50 text-muted-foreground/50 select-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 inline-block" />
+              {APP_VERSION}
+            </span>
+          </div>
+        )}
       </div>
     </div>
     </>
