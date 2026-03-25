@@ -9,16 +9,16 @@ export function MonitoringPage({ initialTab = "urls" }: { initialTab?: SubTab })
   const [tab, setTab] = useState<SubTab>(initialTab);
 
   const tabBtnCls = (active: boolean) =>
-    `px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+    `px-5 py-2.5 text-sm font-medium transition-colors ${
       active
-        ? "dark:text-primary text-primary dark:border-primary border-primary"
-        : "dark:text-muted-foreground text-muted-foreground border-transparent dark:hover:text-foreground hover:text-foreground"
+        ? "border-b-2 border-black text-black"
+        : "text-gray-500 hover:text-gray-700 border-b-2 border-transparent"
     }`;
 
   return (
     <div className="space-y-6">
       {/* Sub-tab bar */}
-      <div className="border-b dark:border-white/5 border-border flex gap-1">
+      <div className="border-b border-gray-200 flex gap-1">
         <button className={tabBtnCls(tab === "urls")}   onClick={() => setTab("urls")}>Product URLs</button>
         <button className={tabBtnCls(tab === "prices")} onClick={() => setTab("prices")}>Prices</button>
         <button className={tabBtnCls(tab === "syncs")}  onClick={() => setTab("syncs")}>Sync Runs</button>

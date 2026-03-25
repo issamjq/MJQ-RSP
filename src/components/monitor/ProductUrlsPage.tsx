@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link2, Plus, RefreshCw, Pencil, Trash2, Play, ExternalLink, Check, X, Sparkles, PlayCircle, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner@2.0.3";
 import {
   urlsApi,
@@ -29,7 +28,7 @@ function ScrapeProgressBanner({ runId, total, onDone }: { runId: number; total: 
         setRun(res.data);
         if (res.data.status !== "running") {
           if (intervalRef.current) clearInterval(intervalRef.current);
-          setTimeout(onDone, 4000); // keep banner visible 4s after finishing
+          setTimeout(onDone, 4000);
         }
       } catch { /* silent */ }
     };
@@ -51,40 +50,39 @@ function ScrapeProgressBanner({ runId, total, onDone }: { runId: number; total: 
     : run?.status === "partial"   ? <AlertCircle  className="h-4 w-4 text-amber-500" />
     : <XCircle className="h-4 w-4 text-red-500" />;
 
-  const statusColor = !isDone ? "dark:border-primary/30 border-primary/20"
-    : run?.status === "completed" ? "dark:border-emerald-500/30 border-emerald-200"
-    : run?.status === "partial"   ? "dark:border-amber-500/30 border-amber-200"
-    : "dark:border-red-500/30 border-red-200";
+  const statusColor = !isDone ? "border-gray-200"
+    : run?.status === "completed" ? "border-emerald-200"
+    : run?.status === "partial"   ? "border-amber-200"
+    : "border-red-200";
 
-  const barColor = !isDone ? "bg-primary"
+  const barColor = !isDone ? "bg-gray-900"
     : run?.status === "completed" ? "bg-emerald-500"
     : run?.status === "partial"   ? "bg-amber-500"
     : "bg-red-500";
 
   return (
-    <div className={`rounded-2xl border ${statusColor} dark:bg-[#12121C] bg-white p-4 transition-all duration-300`}
-      style={{ boxShadow: "0 2px 12px rgba(110,118,255,0.10)" }}>
+    <div className={`rounded-xl border ${statusColor} bg-white shadow-sm p-4 transition-all duration-300`}>
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
           {statusIcon ?? (
             <span className="flex h-4 w-4 items-center justify-center">
-              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-gray-900 animate-pulse" />
             </span>
           )}
-          <span className="text-sm font-semibold dark:text-white text-foreground">
+          <span className="text-sm font-semibold text-foreground">
             {!isDone ? "Scraping in progress…"
               : run?.status === "completed" ? "Scrape complete"
               : run?.status === "partial"   ? "Scrape finished with some errors"
               : "Scrape failed"}
           </span>
         </div>
-        <span className="text-xs font-mono dark:text-muted-foreground text-muted-foreground">
+        <span className="text-xs font-mono text-muted-foreground">
           {checked} / {totalUrls || "?"} URLs
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full dark:bg-white/10 bg-black/5 overflow-hidden mb-2.5">
+      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-2.5">
         <div
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${pct}%` }}
@@ -93,14 +91,14 @@ function ScrapeProgressBanner({ runId, total, onDone }: { runId: number; total: 
 
       {/* Counts */}
       <div className="flex items-center gap-4 text-xs">
-        <span className="flex items-center gap-1 dark:text-emerald-400 text-emerald-600">
+        <span className="flex items-center gap-1 text-emerald-600">
           <Check className="h-3 w-3" /> {success} success
         </span>
-        <span className="flex items-center gap-1 dark:text-red-400 text-red-500">
+        <span className="flex items-center gap-1 text-red-500">
           <X className="h-3 w-3" /> {failed} failed
         </span>
         {!isDone && totalUrls - checked > 0 && (
-          <span className="dark:text-muted-foreground text-muted-foreground">
+          <span className="text-muted-foreground">
             {totalUrls - checked} remaining
           </span>
         )}
@@ -112,12 +110,12 @@ function ScrapeProgressBanner({ runId, total, onDone }: { runId: number; total: 
 // ── Status Badge ───────────────────────────────────────────────────
 
 function ScrapeStatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-xs dark:text-muted-foreground text-muted-foreground">—</span>;
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
   const map: Record<string, string> = {
-    success: "dark:bg-emerald-500/15 bg-emerald-100 dark:text-emerald-400 text-emerald-700 dark:border-emerald-500/30 border-emerald-200",
-    error:   "dark:bg-red-500/15 bg-red-100 dark:text-red-400 text-red-700 dark:border-red-500/30 border-red-200",
-    timeout: "dark:bg-amber-500/15 bg-amber-100 dark:text-amber-400 text-amber-700 dark:border-amber-500/30 border-amber-200",
-    no_price:"dark:bg-zinc-500/15 bg-zinc-100 dark:text-zinc-400 text-zinc-600 dark:border-zinc-500/30 border-zinc-200",
+    success: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    error:   "bg-red-100 text-red-700 border-red-200",
+    timeout: "bg-amber-100 text-amber-700 border-amber-200",
+    no_price:"bg-gray-100 text-gray-600 border-gray-200",
   };
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold border ${map[status] ?? map.no_price}`}>
@@ -126,7 +124,7 @@ function ScrapeStatusBadge({ status }: { status: string | null }) {
   );
 }
 
-// ── Add/Edit URL Modal ─────────────────────────────────────────────
+// ── Add/Edit URL Modal (slide-in from right) ───────────────────────
 
 function UrlForm({ open, initial, companies, products, onClose, onSaved }: {
   open: boolean;
@@ -191,28 +189,35 @@ function UrlForm({ open, initial, companies, products, onClose, onSaved }: {
     }
   };
 
-  const inputCls = "w-full rounded-xl px-3 py-2 text-sm dark:bg-[#1A1A2E] bg-muted/50 border dark:border-white/10 border-border dark:text-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 dark:focus:ring-primary/50 focus:ring-primary/30";
+  const inputCls = "w-full rounded-lg px-3 py-2 text-sm bg-white border border-gray-200 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-black/5";
   const selectCls = inputCls;
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="dark:bg-[#12121C] bg-white border dark:border-primary/20 border-primary/15 rounded-2xl max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="dark:text-white text-foreground">
+    <>
+      <div className="fixed inset-0 z-40 bg-white/10 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-foreground">
             {isEdit ? "Edit URL Mapping" : "Add URL Mapping"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+          </h2>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Product *</label>
+              <label className="text-xs font-medium text-muted-foreground">Product *</label>
               <select className={selectCls} value={productId} onChange={e => setProductId(e.target.value)} disabled={isEdit}>
                 <option value="">Select product…</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.internal_name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Company *</label>
+              <label className="text-xs font-medium text-muted-foreground">Company *</label>
               <select className={selectCls} value={companyId} onChange={e => setCompanyId(e.target.value)} disabled={isEdit}>
                 <option value="">Select company…</option>
                 {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -220,31 +225,31 @@ function UrlForm({ open, initial, companies, products, onClose, onSaved }: {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Product URL *</label>
+            <label className="text-xs font-medium text-muted-foreground">Product URL *</label>
             <input className={inputCls} placeholder="https://www.amazon.ae/dp/B07FNS3HJF" value={url} onChange={e => setUrl(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Currency</label>
+            <label className="text-xs font-medium text-muted-foreground">Currency</label>
             <select className={selectCls} value={currency} onChange={e => setCurrency(e.target.value)}>
               <option>AED</option><option>USD</option><option>SAR</option>
             </select>
           </div>
 
           {/* Optional selector overrides */}
-          <div className="rounded-xl p-3 dark:bg-white/[0.03] bg-muted/30 border dark:border-white/5 border-border space-y-3">
-            <p className="text-xs font-semibold dark:text-muted-foreground text-muted-foreground uppercase tracking-wide">
+          <div className="rounded-lg p-3 bg-gray-50/50 border border-gray-200 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Selector Overrides (optional — leave blank to use company defaults)
             </p>
             <div className="space-y-1.5">
-              <label className="text-xs dark:text-muted-foreground text-muted-foreground">Price CSS Selector</label>
+              <label className="text-xs text-muted-foreground">Price CSS Selector</label>
               <input className={inputCls} placeholder=".a-price .a-offscreen" value={selPrice} onChange={e => setSelPrice(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs dark:text-muted-foreground text-muted-foreground">Title CSS Selector</label>
+              <label className="text-xs text-muted-foreground">Title CSS Selector</label>
               <input className={inputCls} placeholder="#productTitle" value={selTitle} onChange={e => setSelTitle(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs dark:text-muted-foreground text-muted-foreground">Availability CSS Selector</label>
+              <label className="text-xs text-muted-foreground">Availability CSS Selector</label>
               <input className={inputCls} placeholder="#availability span" value={selAvail} onChange={e => setSelAvail(e.target.value)} />
             </div>
           </div>
@@ -252,18 +257,19 @@ function UrlForm({ open, initial, companies, products, onClose, onSaved }: {
           {isEdit && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="rounded" />
-              <span className="text-sm dark:text-white text-foreground">Active</span>
+              <span className="text-sm text-foreground">Active</span>
             </label>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} className="rounded-xl">Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="rounded-xl bg-primary hover:bg-primary/90 text-white">
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} className="rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="rounded-lg bg-black text-white hover:bg-gray-800">
             {saving ? "Saving…" : "Save"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -395,7 +401,7 @@ export function ProductUrlsPage() {
   const openEdit = (u: ProductCompanyUrl) => { setEditTarget(u); setFormOpen(true); };
 
   const totalPages = Math.ceil(total / LIMIT);
-  const selectCls  = "rounded-xl px-3 py-2 text-sm dark:bg-[#1A1A2E] bg-muted/50 border dark:border-white/10 border-border dark:text-white text-foreground focus:outline-none focus:ring-1 dark:focus:ring-primary/50 focus:ring-primary/30";
+  const selectCls  = "rounded-lg px-3 py-2 text-sm bg-white border border-gray-200 text-foreground focus:outline-none focus:ring-2 focus:ring-black/5";
 
   function formatDate(iso: string | null) {
     if (!iso) return "—";
@@ -408,26 +414,26 @@ export function ProductUrlsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight dark:text-white text-foreground">Product URLs</h1>
-          <p className="mt-1 text-sm dark:text-muted-foreground text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Product URLs</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {total} URL mapping{total !== 1 ? "s" : ""} being monitored
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
-            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            className="rounded-lg gap-2 border-gray-200 hover:bg-gray-50">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setDiscoverOpen(true)}
-            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            className="rounded-lg gap-2 border-gray-200 hover:bg-gray-50">
             <Sparkles className="h-4 w-4" /> Auto-Discover
           </Button>
 
-          {/* Scrape Selected — only when items are checked */}
+          {/* Scrape Selected */}
           {selected.size > 0 && (
             <Button size="sm" disabled={bulkRunning}
               onClick={handleScrapeSelected}
-              className="rounded-xl gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              className="rounded-lg gap-2 bg-black text-white hover:bg-gray-800">
               <Play className="h-4 w-4" />
               Scrape {selected.size} selected
             </Button>
@@ -436,13 +442,13 @@ export function ProductUrlsPage() {
           {/* Scrape All */}
           <Button variant="outline" size="sm" disabled={bulkRunning || scraping !== null}
             onClick={handleScrapeAll}
-            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            className="rounded-lg gap-2 border-gray-200 hover:bg-gray-50">
             <PlayCircle className="h-4 w-4" />
             {bulkRunning ? "Starting…" : "Scrape All"}
           </Button>
 
           <Button size="sm" onClick={openAdd}
-            className="rounded-xl gap-2 bg-primary hover:bg-primary/90 text-white">
+            className="rounded-lg gap-2 bg-black text-white hover:bg-gray-800">
             <Plus className="h-4 w-4" /> Add URL
           </Button>
         </div>
@@ -464,101 +470,98 @@ export function ProductUrlsPage() {
       </select>
 
       {/* Table */}
-      <div
-        className="rounded-2xl dark:bg-gradient-to-br dark:from-[#12121C] dark:to-[#16162A] bg-white border dark:border-primary/20 border-primary/15 overflow-hidden"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
-      >
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b dark:border-white/5 border-border">
-                <th className="pl-4 pr-2 py-3.5 w-10">
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="pl-4 pr-2 py-3 w-10">
                   <input
                     type="checkbox"
                     checked={urls.length > 0 && selected.size === urls.length}
                     ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < urls.length; }}
                     onChange={toggleSelectAll}
-                    className="rounded cursor-pointer accent-primary"
+                    className="rounded cursor-pointer"
                   />
                 </th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Product</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Company</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden lg:table-cell">URL</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Last Status</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden md:table-cell">Last Checked</th>
-                <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Active</th>
-                <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Actions</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Company</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">URL</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Last Status</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Last Checked</th>
+                <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Active</th>
+                <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y dark:divide-white/5 divide-border">
+            <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-muted-foreground">Loading…</td></tr>
               ) : urls.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-muted-foreground">
                   <Link2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
                   No URL mappings yet — add one to start tracking prices
                 </td></tr>
               ) : (
                 urls.map(u => (
-                  <tr key={u.id} className={`transition-colors ${selected.has(u.id) ? "dark:bg-primary/5 bg-primary/5" : "dark:hover:bg-white/[0.02] hover:bg-muted/30"}`}>
-                    <td className="pl-4 pr-2 py-3.5">
+                  <tr key={u.id} className={`border-b border-gray-50 transition-colors ${selected.has(u.id) ? "bg-gray-50" : "hover:bg-gray-50/50"}`}>
+                    <td className="pl-4 pr-2 py-4">
                       <input
                         type="checkbox"
                         checked={selected.has(u.id)}
                         onChange={() => toggleSelect(u.id)}
-                        className="rounded cursor-pointer accent-primary"
+                        className="rounded cursor-pointer"
                       />
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {u.image_url ? (
-                          <img src={u.image_url} alt="" className="h-10 w-10 rounded-lg object-contain shrink-0 dark:bg-white/5 bg-muted/50 border dark:border-white/10 border-border" />
+                          <img src={u.image_url} alt="" className="h-10 w-10 rounded-lg object-contain shrink-0 bg-gray-50 border border-gray-100" />
                         ) : (
-                          <div className="h-10 w-10 rounded-lg shrink-0 dark:bg-white/5 bg-muted/30 border dark:border-white/10 border-border" />
+                          <div className="h-10 w-10 rounded-lg shrink-0 bg-gray-50 border border-gray-100" />
                         )}
                         <div>
-                          <div className="font-medium dark:text-white text-foreground text-sm">{u.internal_name}</div>
-                          {u.internal_sku && <div className="text-xs dark:text-muted-foreground text-muted-foreground font-mono">{u.internal_sku}</div>}
+                          <div className="font-medium text-foreground text-sm">{u.internal_name}</div>
+                          {u.internal_sku && <div className="text-xs text-muted-foreground font-mono">{u.internal_sku}</div>}
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="dark:text-muted-foreground text-muted-foreground">{u.company_name}</span>
+                    <td className="px-6 py-4">
+                      <span className="text-muted-foreground">{u.company_name}</span>
                     </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell max-w-[200px]">
+                    <td className="px-6 py-4 hidden lg:table-cell max-w-[200px]">
                       <a href={u.product_url} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-1 dark:text-primary text-primary hover:underline text-xs truncate">
+                        className="flex items-center gap-1 text-gray-700 hover:underline text-xs truncate">
                         <span className="truncate">{u.product_url}</span>
                         <ExternalLink className="h-3 w-3 shrink-0" />
                       </a>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-6 py-4">
                       <ScrapeStatusBadge status={u.last_status} />
                     </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
-                      <span className="text-xs dark:text-muted-foreground text-muted-foreground">
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <span className="text-xs text-muted-foreground">
                         {formatDate(u.last_checked_at)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-center">
+                    <td className="px-6 py-4 text-center">
                       {u.is_active
-                        ? <Check className="h-4 w-4 dark:text-emerald-400 text-emerald-600 mx-auto" />
-                        : <X className="h-4 w-4 dark:text-muted-foreground text-muted-foreground mx-auto" />}
+                        ? <Check className="h-4 w-4 text-emerald-600 mx-auto" />
+                        : <X className="h-4 w-4 text-muted-foreground mx-auto" />}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button variant="ghost" size="icon" title={scraping !== null && scraping !== u.id ? "Wait for current scrape to finish" : "Scrape this URL"}
                           disabled={scraping !== null}
                           onClick={() => handleScrapeOne(u)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-primary hover:text-primary">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-gray-900 hover:bg-gray-100">
                           <Play className={`h-3.5 w-3.5 ${scraping === u.id ? "animate-pulse" : ""}`} />
                         </Button>
                         <Button variant="ghost" size="icon" title="Edit" onClick={() => openEdit(u)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-gray-900 hover:bg-gray-100">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" title="Delete" onClick={() => handleDelete(u)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-red-400 hover:text-red-500">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -572,13 +575,13 @@ export function ProductUrlsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t dark:border-white/5 border-border">
-            <p className="text-xs dark:text-muted-foreground text-muted-foreground">
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+            <p className="text-xs text-muted-foreground">
               {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, total)} of {total}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="rounded-lg h-7 px-3 text-xs">Prev</Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-lg h-7 px-3 text-xs">Next</Button>
+              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="rounded-lg h-7 px-3 text-xs border-gray-200">Prev</Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-lg h-7 px-3 text-xs border-gray-200">Next</Button>
             </div>
           </div>
         )}

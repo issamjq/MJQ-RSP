@@ -1,13 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { Building2, Plus, RefreshCw, Pencil, Trash2, Play, Check, X, Zap, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Building2, Plus, RefreshCw, Pencil, Trash2, Play, Check, X, Zap, Loader2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "../ui/button";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "../ui/dialog";
 import { toast } from "sonner@2.0.3";
 import { companiesApi, scraperApi, discoveryApi, type Company, type ProbeResult } from "../../lib/monitorApi";
 
-// ── Form Modal ─────────────────────────────────────────────────────
+// ── Form Modal (slide-in from right) ───────────────────────────────
 
 interface CompanyFormProps {
   open: boolean;
@@ -24,7 +21,6 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
   const [active,  setActive]  = useState(initial?.is_active ?? true);
   const [saving,  setSaving]  = useState(false);
 
-  // Probe state
   const [probing,      setProbing]      = useState(false);
   const [probeResult,  setProbeResult]  = useState<ProbeResult | null>(null);
   const [probeQuery,   setProbeQuery]   = useState("shampoo");
@@ -74,12 +70,11 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
         companyId = res.data.id;
         toast.success("Company created");
       }
-      // If probe succeeded, save the detected search URL into company config
       if (probeResult?.success && probeResult.search_url_template) {
         await companiesApi.upsertConfig(companyId, {
           page_options: { search_url_template: probeResult.search_url_template },
           notes: `Auto-detected: ${probeResult.products_found} products found via ${probeResult.pattern}`,
-        }).catch(() => {}); // non-fatal
+        }).catch(() => {});
       }
       onSaved();
       onClose();
@@ -90,33 +85,46 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
     }
   };
 
-  const inputCls = "w-full rounded-xl px-3 py-2 text-sm dark:bg-[#1A1A2E] bg-muted/50 border dark:border-white/10 border-border dark:text-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 dark:focus:ring-primary/50 focus:ring-primary/30";
+  const inputCls = "w-full rounded-lg px-3 py-2 text-sm bg-white border border-gray-200 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-black/5";
+
+  if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="dark:bg-[#12121C] bg-white border dark:border-primary/20 border-primary/15 rounded-2xl max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="dark:text-white text-foreground">
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-white/10 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Slide-in panel */}
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-foreground">
             {isEdit ? "Edit Company" : "Add Company"}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
 
-        <div className="space-y-4 py-2">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Name *</label>
+            <label className="text-xs font-medium text-muted-foreground">Name *</label>
             <input className={inputCls} placeholder="Life Pharmacy" value={name} onChange={e => handleNameChange(e.target.value)} />
           </div>
 
           {/* Slug */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Slug *</label>
+            <label className="text-xs font-medium text-muted-foreground">Slug *</label>
             <input className={inputCls} placeholder="life-pharmacy" value={slug} onChange={e => setSlug(e.target.value)} />
           </div>
 
           {/* Base URL */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium dark:text-muted-foreground text-muted-foreground">Website URL</label>
+            <label className="text-xs font-medium text-muted-foreground">Website URL</label>
             <input
               className={inputCls}
               placeholder="https://www.example.com"
@@ -127,11 +135,11 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
 
           {/* Auto-Detect Section */}
           {!isEdit && (
-            <div className="rounded-xl border dark:border-white/10 border-border dark:bg-[#1A1A2E]/50 bg-muted/30 p-3 space-y-3">
+            <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 space-y-3">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-xs font-semibold dark:text-white text-foreground">Auto-Detect Search</span>
-                <span className="text-xs dark:text-muted-foreground text-muted-foreground">— finds how this site's search works</span>
+                <Zap className="h-4 w-4 text-gray-700 shrink-0" />
+                <span className="text-xs font-semibold text-foreground">Auto-Detect Search</span>
+                <span className="text-xs text-muted-foreground">— finds how this site's search works</span>
               </div>
 
               <div className="flex gap-2">
@@ -147,31 +155,30 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
                   size="sm"
                   onClick={handleProbe}
                   disabled={probing || !baseUrl.trim()}
-                  className="rounded-xl shrink-0 gap-1.5 dark:border-primary/30 border-primary/20"
+                  className="rounded-lg shrink-0 gap-1.5 border-gray-200"
                 >
-                  {probing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
+                  {probing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                   {probing ? "Testing…" : "Test"}
                 </Button>
               </div>
 
-              {/* Probe Result */}
               {probeResult && (
                 <div className={`rounded-lg p-3 text-xs space-y-1.5 border ${
                   probeResult.success
-                    ? "dark:bg-emerald-500/10 bg-emerald-50 dark:border-emerald-500/20 border-emerald-200"
-                    : "dark:bg-red-500/10 bg-red-50 dark:border-red-500/20 border-red-200"
+                    ? "bg-emerald-50 border-emerald-200"
+                    : "bg-red-50 border-red-200"
                 }`}>
                   {probeResult.success ? (
                     <>
-                      <div className="flex items-center gap-1.5 dark:text-emerald-400 text-emerald-700 font-semibold">
+                      <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Works! Found {probeResult.products_found} products
                       </div>
-                      <div className="dark:text-emerald-300/80 text-emerald-800 font-mono truncate">
+                      <div className="text-emerald-800 font-mono truncate">
                         {probeResult.pattern}
                       </div>
                       {probeResult.sample && probeResult.sample.length > 0 && (
-                        <div className="dark:text-emerald-300/60 text-emerald-700/70 space-y-0.5 pt-1">
+                        <div className="text-emerald-700/70 space-y-0.5 pt-1">
                           {probeResult.sample.slice(0, 3).map((p, i) => (
                             <div key={i} className="truncate">• {p.name}</div>
                           ))}
@@ -179,7 +186,7 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
                       )}
                     </>
                   ) : (
-                    <div className="flex items-start gap-1.5 dark:text-red-400 text-red-700">
+                    <div className="flex items-start gap-1.5 text-red-700">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                       <span>{probeResult.message || "Could not detect search URL. You can still add it and configure manually."}</span>
                     </div>
@@ -188,7 +195,7 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
               )}
 
               {!probeResult && !probing && (
-                <p className="text-[11px] dark:text-muted-foreground/70 text-muted-foreground/70">
+                <p className="text-[11px] text-muted-foreground/70">
                   Enter the website URL above, then click Test to automatically detect how to search it.
                   Works for most sites — no code needed.
                 </p>
@@ -199,19 +206,20 @@ function CompanyForm({ open, initial, onClose, onSaved }: CompanyFormProps) {
           {isEdit && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="rounded" />
-              <span className="text-sm dark:text-white text-foreground">Active</span>
+              <span className="text-sm text-foreground">Active</span>
             </label>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} className="rounded-xl">Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="rounded-xl bg-primary hover:bg-primary/90 text-white">
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} className="rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="rounded-lg bg-black text-white hover:bg-gray-800">
             {saving ? "Saving…" : "Save"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -269,19 +277,19 @@ export function CompaniesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight dark:text-white text-foreground">Companies</h1>
-          <p className="mt-1 text-sm dark:text-muted-foreground text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Companies</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {companies.length} marketplace{companies.length !== 1 ? "s" : ""} configured
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
-            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            className="rounded-lg gap-2 border-gray-200 hover:bg-gray-50">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button size="sm" onClick={openAdd}
-            className="rounded-xl gap-2 bg-primary hover:bg-primary/90 text-white">
+            className="rounded-lg gap-2 bg-black text-white hover:bg-gray-800">
             <Plus className="h-4 w-4" />
             Add Company
           </Button>
@@ -289,83 +297,80 @@ export function CompaniesPage() {
       </div>
 
       {/* How it works info box */}
-      <div className="rounded-xl border dark:border-primary/15 border-primary/10 dark:bg-primary/5 bg-primary/[0.03] p-4 text-sm dark:text-muted-foreground text-muted-foreground space-y-1">
-        <p className="font-semibold dark:text-white text-foreground text-xs uppercase tracking-wide mb-2">How adding a new website works</p>
-        <p>1. Click <span className="dark:text-white text-foreground font-medium">Add Company</span> → enter name + website URL → click <span className="dark:text-white text-foreground font-medium">Test</span> to auto-detect how the site's search works.</p>
-        <p>2. Once added, go to <span className="dark:text-white text-foreground font-medium">Product URLs → Auto-Discover</span>, pick the company, type any product/brand name, and Claude AI finds + matches the products for you.</p>
+      <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 text-sm text-muted-foreground space-y-1">
+        <p className="font-semibold text-foreground text-xs uppercase tracking-wide mb-2">How adding a new website works</p>
+        <p>1. Click <span className="text-foreground font-medium">Add Company</span> → enter name + website URL → click <span className="text-foreground font-medium">Test</span> to auto-detect how the site's search works.</p>
+        <p>2. Once added, go to <span className="text-foreground font-medium">Product URLs → Auto-Discover</span>, pick the company, type any product/brand name, and Claude AI finds + matches the products for you.</p>
         <p>3. No code needed for most websites. Special sites (apps, login-required) may need manual setup.</p>
       </div>
 
       {/* Table */}
-      <div
-        className="rounded-2xl dark:bg-gradient-to-br dark:from-[#12121C] dark:to-[#16162A] bg-white border dark:border-primary/20 border-primary/15 overflow-hidden"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
-      >
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b dark:border-white/5 border-border">
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Company</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden md:table-cell">Slug</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden lg:table-cell">Base URL</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Status</th>
-                <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Actions</th>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Company</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden md:table-cell">Slug</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Base URL</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
+                <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y dark:divide-white/5 divide-border">
+            <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">Loading…</td></tr>
               ) : companies.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">
+                <tr><td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">
                   <Building2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
                   No companies yet. Add one to start.
                 </td></tr>
               ) : (
                 companies.map(c => (
-                  <tr key={c.id} className="dark:hover:bg-white/[0.02] hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="font-medium dark:text-white text-foreground">{c.name}</div>
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-foreground">{c.name}</div>
                     </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
-                      <span className="dark:text-muted-foreground text-muted-foreground font-mono text-xs">{c.slug}</span>
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <span className="text-muted-foreground font-mono text-xs">{c.slug}</span>
                     </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                    <td className="px-6 py-4 hidden lg:table-cell">
                       {c.base_url ? (
                         <a href={c.base_url} target="_blank" rel="noreferrer"
-                          className="dark:text-primary text-primary hover:underline text-xs truncate max-w-[200px] block">
+                          className="text-gray-700 hover:underline text-xs truncate max-w-[200px] block">
                           {c.base_url}
                         </a>
                       ) : (
-                        <span className="dark:text-muted-foreground text-muted-foreground text-xs">—</span>
+                        <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-6 py-4">
                       {c.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-xs dark:text-emerald-400 text-emerald-600">
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
                           <Check className="h-3 w-3" /> Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs dark:text-muted-foreground text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <X className="h-3 w-3" /> Inactive
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button variant="ghost" size="icon" title="Scrape this company"
                           disabled={scraping === c.id}
                           onClick={() => handleScrapeCompany(c)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-primary hover:text-primary">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-gray-900 hover:bg-gray-100">
                           <Play className={`h-3.5 w-3.5 ${scraping === c.id ? "animate-pulse" : ""}`} />
                         </Button>
                         <Button variant="ghost" size="icon" title="Edit"
                           onClick={() => openEdit(c)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-foreground hover:text-foreground">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-gray-900 hover:bg-gray-100">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" title="Delete"
                           onClick={() => handleDelete(c)}
-                          className="h-8 w-8 rounded-lg dark:text-muted-foreground text-muted-foreground dark:hover:text-red-400 hover:text-red-500">
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>

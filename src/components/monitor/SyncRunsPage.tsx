@@ -26,10 +26,10 @@ function formatDate(iso: string) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    completed: "dark:bg-emerald-500/15 bg-emerald-100 dark:text-emerald-400 text-emerald-700 dark:border-emerald-500/30 border-emerald-200",
-    running:   "dark:bg-blue-500/15 bg-blue-100 dark:text-blue-400 text-blue-700 dark:border-blue-500/30 border-blue-200",
-    partial:   "dark:bg-amber-500/15 bg-amber-100 dark:text-amber-400 text-amber-700 dark:border-amber-500/30 border-amber-200",
-    failed:    "dark:bg-red-500/15 bg-red-100 dark:text-red-400 text-red-700 dark:border-red-500/30 border-red-200",
+    completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    running:   "bg-blue-100 text-blue-700 border-blue-200",
+    partial:   "bg-amber-100 text-amber-700 border-amber-200",
+    failed:    "bg-red-100 text-red-700 border-red-200",
   };
   const icon: Record<string, string> = {
     completed: "●", running: "◌", partial: "◑", failed: "✕",
@@ -49,7 +49,7 @@ function RunTypeBadge({ type }: { type: string }) {
     full_batch:    "Full",
   };
   return (
-    <span className="inline-flex px-2 py-0.5 rounded-md text-xs dark:bg-primary/10 bg-primary/5 dark:text-primary text-primary dark:border-primary/20 border-primary/15 border font-medium">
+    <span className="inline-flex px-2 py-0.5 rounded-md text-xs bg-gray-100 text-gray-700 border border-gray-200 font-medium">
       {labels[type] ?? type}
     </span>
   );
@@ -92,24 +92,23 @@ export function SyncRunsPage() {
     }
   };
 
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight dark:text-white text-foreground">Sync Runs</h1>
-          <p className="mt-1 text-sm dark:text-muted-foreground text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Sync Runs</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Scraper execution history
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
-            className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">
+            className="rounded-lg gap-2 border-gray-200 hover:bg-gray-50">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button size="sm" onClick={handleRunAll} disabled={runningAll}
-            className="rounded-xl gap-2 bg-primary hover:bg-primary/90 text-white">
+            className="rounded-lg gap-2 bg-black text-white hover:bg-gray-800">
             <RotateCw className={`h-4 w-4 ${runningAll ? "animate-spin" : ""}`} />
             {runningAll ? "Starting…" : "Run All"}
           </Button>
@@ -117,29 +116,26 @@ export function SyncRunsPage() {
       </div>
 
       {/* Table */}
-      <div
-        className="rounded-2xl dark:bg-gradient-to-br dark:from-[#12121C] dark:to-[#16162A] bg-white border dark:border-primary/20 border-primary/15 overflow-hidden"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
-      >
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b dark:border-white/5 border-border">
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Status</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Type</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden sm:table-cell">Company</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden md:table-cell">Started</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground hidden md:table-cell">Duration</th>
-                <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">Checked</th>
-                <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider dark:text-muted-foreground text-muted-foreground">✓ / ✗</th>
-                <th className="px-5 py-3.5 w-10"></th>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Status</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Type</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Company</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Started</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Duration</th>
+                <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Checked</th>
+                <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase">✓ / ✗</th>
+                <th className="px-6 py-3 w-10"></th>
               </tr>
             </thead>
-            <tbody className="divide-y dark:divide-white/5 divide-border">
+            <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-muted-foreground">Loading…</td></tr>
               ) : runs.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center dark:text-muted-foreground text-muted-foreground">
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-muted-foreground">
                   <RotateCw className="h-8 w-8 mx-auto mb-2 opacity-40" />
                   No sync runs yet — press "Run All" to start
                 </td></tr>
@@ -147,58 +143,58 @@ export function SyncRunsPage() {
                 runs.map(run => (
                   <Fragment key={run.id}>
                     <tr
-                      className="dark:hover:bg-white/[0.02] hover:bg-muted/30 transition-colors cursor-pointer"
+                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
                       onClick={() => setExpanded(expanded === run.id ? null : run.id)}>
-                      <td className="px-5 py-3.5"><StatusBadge status={run.status} /></td>
-                      <td className="px-5 py-3.5"><RunTypeBadge type={run.run_type} /></td>
-                      <td className="px-5 py-3.5 hidden sm:table-cell">
-                        <span className="dark:text-muted-foreground text-muted-foreground text-xs">
+                      <td className="px-6 py-4"><StatusBadge status={run.status} /></td>
+                      <td className="px-6 py-4"><RunTypeBadge type={run.run_type} /></td>
+                      <td className="px-6 py-4 hidden sm:table-cell">
+                        <span className="text-muted-foreground text-xs">
                           {run.company_name ?? "All"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 hidden md:table-cell">
-                        <span className="text-xs dark:text-muted-foreground text-muted-foreground whitespace-nowrap">
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {formatDate(run.started_at)}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 hidden md:table-cell">
-                        <span className="text-xs dark:text-muted-foreground text-muted-foreground">
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <span className="text-xs text-muted-foreground">
                           {formatDuration(run.started_at, run.finished_at)}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className="font-semibold dark:text-white text-foreground">{run.total_checked}</span>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-semibold text-foreground">{run.total_checked}</span>
                       </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className="dark:text-emerald-400 text-emerald-600 font-medium">{run.success_count}</span>
-                        <span className="dark:text-muted-foreground text-muted-foreground mx-1">/</span>
-                        <span className={run.fail_count > 0 ? "dark:text-red-400 text-red-500 font-medium" : "dark:text-muted-foreground text-muted-foreground"}>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-emerald-600 font-medium">{run.success_count}</span>
+                        <span className="text-muted-foreground mx-1">/</span>
+                        <span className={run.fail_count > 0 ? "text-red-500 font-medium" : "text-muted-foreground"}>
                           {run.fail_count}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5">
-                        <ChevronDown className={`h-4 w-4 dark:text-muted-foreground text-muted-foreground transition-transform ${expanded === run.id ? "rotate-180" : ""}`} />
+                      <td className="px-6 py-4">
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded === run.id ? "rotate-180" : ""}`} />
                       </td>
                     </tr>
                     {expanded === run.id && (
-                      <tr className="dark:bg-white/[0.01] bg-muted/10">
+                      <tr className="bg-gray-50/30">
                         <td colSpan={8} className="px-6 py-4">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                             <div>
-                              <p className="dark:text-muted-foreground text-muted-foreground mb-1">Run ID</p>
-                              <p className="dark:text-white text-foreground font-mono">#{run.id}</p>
+                              <p className="text-muted-foreground mb-1">Run ID</p>
+                              <p className="text-foreground font-mono">#{run.id}</p>
                             </div>
                             <div>
-                              <p className="dark:text-muted-foreground text-muted-foreground mb-1">Triggered By</p>
-                              <p className="dark:text-white text-foreground capitalize">{run.triggered_by}</p>
+                              <p className="text-muted-foreground mb-1">Triggered By</p>
+                              <p className="text-foreground capitalize">{run.triggered_by}</p>
                             </div>
                             <div>
-                              <p className="dark:text-muted-foreground text-muted-foreground mb-1">Finished</p>
-                              <p className="dark:text-white text-foreground">{run.finished_at ? formatDate(run.finished_at) : "—"}</p>
+                              <p className="text-muted-foreground mb-1">Finished</p>
+                              <p className="text-foreground">{run.finished_at ? formatDate(run.finished_at) : "—"}</p>
                             </div>
                             <div>
-                              <p className="dark:text-muted-foreground text-muted-foreground mb-1">Success Rate</p>
-                              <p className="dark:text-white text-foreground font-semibold">
+                              <p className="text-muted-foreground mb-1">Success Rate</p>
+                              <p className="text-foreground font-semibold">
                                 {run.total_checked > 0
                                   ? `${Math.round((run.success_count / run.total_checked) * 100)}%`
                                   : "—"}
@@ -206,8 +202,8 @@ export function SyncRunsPage() {
                             </div>
                           </div>
                           {run.error_message && (
-                            <div className="mt-3 p-2 rounded-lg dark:bg-red-500/10 bg-red-50 border dark:border-red-500/20 border-red-200">
-                              <p className="text-xs dark:text-red-400 text-red-600">{run.error_message}</p>
+                            <div className="mt-3 p-2 rounded-lg bg-red-50 border border-red-200">
+                              <p className="text-xs text-red-600">{run.error_message}</p>
                             </div>
                           )}
                         </td>
