@@ -64,7 +64,7 @@ export function ModernTopbar({
               <rect x="0" y="0" width="38" height="38" rx="12" fill="#ffffff"/>
               <rect x="9" y="9" width="20" height="20" rx="8" fill="#ffffff" style={{filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.12))"}}/>
               <rect x="12" y="12" width="14" height="3.6" rx="2" fill="#6E76FF"/>
-              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#A78BFA"/>
+              <rect x="12" y="17" width="14" height="3.6" rx="2" fill="#939BFF"/>
               <rect x="12" y="22" width="14" height="3.6" rx="2" fill="#111827"/>
             </svg>
           </div>

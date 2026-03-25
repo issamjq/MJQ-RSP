@@ -1,13 +1,11 @@
 import { useEffect, useState, useCallback, Fragment } from "react";
-import { RotateCw, Play, Building2, RefreshCw, ChevronDown } from "lucide-react";
+import { RotateCw, RefreshCw, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { toast } from "sonner@2.0.3";
 import {
   syncRunsApi,
-  companiesApi,
   scraperApi,
   type SyncRun,
-  type Company,
 } from "../../lib/monitorApi";
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -60,22 +58,16 @@ function RunTypeBadge({ type }: { type: string }) {
 // ── Main Page ──────────────────────────────────────────────────────
 
 export function SyncRunsPage() {
-  const [runs,      setRuns]      = useState<SyncRun[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [runningAll, setRunningAll]   = useState(false);
-  const [runningComp, setRunningComp] = useState<number | null>(null);
-  const [expanded, setExpanded]   = useState<number | null>(null);
+  const [runs,    setRuns]    = useState<SyncRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [runningAll, setRunningAll] = useState(false);
+  const [expanded, setExpanded]    = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [runsRes, compRes] = await Promise.all([
-        syncRunsApi.list({ limit: 50 }),
-        companiesApi.list(true),
-      ]);
+      const runsRes = await syncRunsApi.list({ limit: 50 });
       setRuns(runsRes.data as SyncRun[]);
-      setCompanies(compRes.data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load";
       toast.error(msg);
@@ -100,19 +92,6 @@ export function SyncRunsPage() {
     }
   };
 
-  const handleRunCompany = async (company: Company) => {
-    setRunningComp(company.id);
-    try {
-      await scraperApi.runCompany(company.id);
-      toast.success(`Scrape started for ${company.name}`);
-      setTimeout(load, 1500);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to start";
-      toast.error(msg);
-    } finally {
-      setRunningComp(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -134,24 +113,6 @@ export function SyncRunsPage() {
             <RotateCw className={`h-4 w-4 ${runningAll ? "animate-spin" : ""}`} />
             {runningAll ? "Starting…" : "Run All"}
           </Button>
-        </div>
-      </div>
-
-      {/* Quick company run buttons */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          {companies.slice(0, 5).map(c => (
-            <Button key={c.id} variant="outline" size="sm"
-              disabled={runningComp === c.id}
-              onClick={() => handleRunCompany(c)}
-              className="rounded-xl gap-1.5 text-xs h-8 dark:border-primary/30 border-primary/20 dark:hover:bg-primary/10 hover:bg-primary/5">
-              <Play className="h-3 w-3" />
-              {runningComp === c.id ? "Starting…" : c.name}
-            </Button>
-          ))}
-          {companies.length > 5 && (
-            <span className="text-xs dark:text-muted-foreground text-muted-foreground">+{companies.length - 5} more</span>
-          )}
         </div>
       </div>
 

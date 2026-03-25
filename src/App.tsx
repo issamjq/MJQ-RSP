@@ -163,7 +163,7 @@ function AppShell() {
         {/* Regular pages with padding */}
         {activePage !== "launcher" && activePage !== "published" && activePage !== "messages" && (
           <main className="pt-16">
-            <div className="max-w-[1400px] mx-auto px-6 py-8">
+            <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
               {activePage === "dashboard" && (
                 <DashboardPage
                   dateRange={dateRange}
