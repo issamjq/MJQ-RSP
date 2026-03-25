@@ -44,4 +44,15 @@ async function remove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, get, create, update, remove };
+async function importProducts(req, res, next) {
+  try {
+    const { products } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      return next(createError('products array required', 400, 'VALIDATION'));
+    }
+    const result = await productService.bulkImport(products);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, get, create, update, remove, importProducts };

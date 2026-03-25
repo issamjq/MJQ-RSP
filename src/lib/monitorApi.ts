@@ -160,6 +160,15 @@ export const productsApi = {
 
   delete: (id: number) =>
     api.del<{ success: boolean; message: string }>(`/api/products/${id}`),
+
+  import: (products: Array<{
+    internal_name: string;
+    internal_sku: string;
+    barcode?: string;
+    brand?: string;
+    image_url?: string;
+    is_active?: boolean;
+  }>) => api.post<{ success: boolean; data: { inserted: number; updated: number; total: number } }>("/api/products/import", { products }),
 };
 
 // ── Product Company URLs ──────────────────────────────────────────

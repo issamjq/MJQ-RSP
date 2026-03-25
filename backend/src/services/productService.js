@@ -111,4 +111,28 @@ async function remove(id) {
   return rowCount > 0;
 }
 
-module.exports = { getAll, getById, create, update, remove };
+async function bulkImport(items) {
+  let inserted = 0, updated = 0;
+  for (const item of items) {
+    if (!item.internal_name || !item.internal_sku) continue;
+    const { rows } = await db.query(
+      `INSERT INTO products (internal_name, internal_sku, barcode, brand, image_url, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (internal_sku) DO UPDATE SET
+         internal_name = EXCLUDED.internal_name,
+         barcode       = EXCLUDED.barcode,
+         brand         = EXCLUDED.brand,
+         image_url     = EXCLUDED.image_url,
+         is_active     = EXCLUDED.is_active,
+         updated_at    = NOW()
+       RETURNING (xmax = 0) AS inserted`,
+      [item.internal_name, String(item.internal_sku),
+       item.barcode || null, item.brand || null,
+       item.image_url || null, item.is_active ?? true]
+    );
+    if (rows[0]?.inserted) inserted++; else updated++;
+  }
+  return { inserted, updated, total: inserted + updated };
+}
+
+module.exports = { getAll, getById, create, update, remove, bulkImport };
