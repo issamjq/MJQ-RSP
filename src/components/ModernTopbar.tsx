@@ -1,4 +1,4 @@
-import { Settings, Globe, Moon, Sun, User, LogOut, Menu } from "lucide-react";
+import { Settings, Globe, Moon, Sun, LogOut, Menu } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
@@ -12,6 +12,8 @@ import {
 } from "./ui/dropdown-menu";
 import { Language, t } from "../lib/i18n";
 import { ProfileModal } from "./ProfileModal";
+import { useAuth } from "../lib/AuthContext";
+import { logout } from "../lib/firebase";
 
 interface ModernTopbarProps {
   theme: "light" | "dark";
@@ -35,6 +37,7 @@ export function ModernTopbar({
   onMobileMenuToggle,
 }: ModernTopbarProps) {
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const { user } = useAuth();
 
   return (
     <>
@@ -126,21 +129,37 @@ export function ModernTopbar({
               <Settings className="h-5 w-5 dark:text-muted-foreground text-muted-foreground" />
             </Button>
 
-            {/* Account Button - Opens Profile Modal */}
-            <Button 
-              variant="ghost" 
-              className="h-10 pl-2 pr-3 rounded-xl dark:hover:bg-surface-hover hover:bg-muted/50 gap-2"
-              onClick={() => setShowProfileModal(true)}
-            >
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="dark:bg-primary bg-primary dark:text-white text-white text-xs font-semibold">
-                  VU
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium dark:text-foreground text-foreground hidden md:inline">
-                {t(language, "topbar.account")}
-              </span>
-            </Button>
+            {/* Account Button - shows Google photo + name */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-10 pl-2 pr-3 rounded-xl dark:hover:bg-surface-hover hover:bg-muted/50 gap-2"
+                >
+                  <Avatar className="h-7 w-7">
+                    {user?.photoURL
+                      ? <img src={user.photoURL} alt="" className="h-7 w-7 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      : <AvatarFallback className="dark:bg-primary bg-primary dark:text-white text-white text-xs font-semibold">
+                          {user?.displayName?.[0]?.toUpperCase() ?? "U"}
+                        </AvatarFallback>
+                    }
+                  </Avatar>
+                  <span className="text-sm font-medium dark:text-foreground text-foreground hidden md:inline max-w-[120px] truncate">
+                    {user?.displayName ?? t(language, "topbar.account")}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl dark:bg-popover bg-popover dark:border-border border-border">
+                <DropdownMenuLabel className="text-xs dark:text-muted-foreground text-muted-foreground font-normal truncate">
+                  {user?.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="rounded-lg text-red-500 dark:text-red-400 focus:text-red-500 gap-2">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
