@@ -65,14 +65,13 @@ export function SyncRunsPage() {
   const [loading,   setLoading]   = useState(true);
   const [runningAll, setRunningAll]   = useState(false);
   const [runningComp, setRunningComp] = useState<number | null>(null);
-  const [filterStatus, setFilterStatus] = useState("");
   const [expanded, setExpanded]   = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [runsRes, compRes] = await Promise.all([
-        syncRunsApi.list({ status: filterStatus || undefined, limit: 50 }),
+        syncRunsApi.list({ limit: 50 }),
         companiesApi.list(true),
       ]);
       setRuns(runsRes.data as SyncRun[]);
@@ -83,17 +82,9 @@ export function SyncRunsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Poll every 5s while any run is "running"
-  useEffect(() => {
-    const hasRunning = runs.some(r => r.status === "running");
-    if (!hasRunning) return;
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
-  }, [runs, load]);
 
   const handleRunAll = async () => {
     setRunningAll(true);
@@ -123,8 +114,6 @@ export function SyncRunsPage() {
     }
   };
 
-  const selectCls = "rounded-xl px-3 py-2 text-sm dark:bg-[#1A1A2E] bg-muted/50 border dark:border-white/10 border-border dark:text-white text-foreground focus:outline-none focus:ring-1 dark:focus:ring-primary/50 focus:ring-primary/30";
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -148,17 +137,8 @@ export function SyncRunsPage() {
         </div>
       </div>
 
-      {/* Quick company run + filter row */}
+      {/* Quick company run buttons */}
       <div className="flex items-center gap-3 flex-wrap">
-        <select className={selectCls} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">All Statuses</option>
-          <option value="completed">Completed</option>
-          <option value="running">Running</option>
-          <option value="partial">Partial</option>
-          <option value="failed">Failed</option>
-        </select>
-
-        {/* Run per-company buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           {companies.slice(0, 5).map(c => (
             <Button key={c.id} variant="outline" size="sm"

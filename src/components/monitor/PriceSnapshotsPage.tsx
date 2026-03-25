@@ -297,10 +297,11 @@ export function PriceSnapshotsPage() {
             size="sm"
             onClick={() => setShowPdf(true)}
             disabled={loading || successSnaps.length === 0}
+            title={`Export ${successSnaps.length} successfully scraped snapshot${successSnaps.length !== 1 ? "s" : ""} as PDF`}
             className="rounded-xl gap-2 dark:border-primary/30 border-primary/20"
           >
             <Download className="h-4 w-4" />
-            Export PDF
+            Export PDF {successSnaps.length > 0 && `(${successSnaps.length})`}
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
             className="rounded-xl gap-2 dark:border-primary/30 border-primary/20">

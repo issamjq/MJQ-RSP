@@ -174,7 +174,7 @@ export function ProductsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight dark:text-white text-foreground">Products</h1>
           <p className="mt-1 text-sm dark:text-muted-foreground text-muted-foreground">
-            {total} product{total !== 1 ? "s" : ""} in catalog
+            {total} product{total !== 1 ? "s" : ""} in your reference catalog — the "URLs" column shows how many stores are monitored per product
           </p>
         </div>
         <div className="flex items-center gap-2">

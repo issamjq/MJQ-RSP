@@ -21,9 +21,7 @@ import { TrackingPublicPage } from "./components/tracking/TrackingPublicPage";
 import { MonitorDashboard } from "./components/monitor/MonitorDashboard";
 import { CompaniesPage } from "./components/monitor/CompaniesPage";
 import { ProductsPage } from "./components/monitor/ProductsPage";
-import { ProductUrlsPage } from "./components/monitor/ProductUrlsPage";
-import { PriceSnapshotsPage } from "./components/monitor/PriceSnapshotsPage";
-import { SyncRunsPage } from "./components/monitor/SyncRunsPage";
+import { MonitoringPage } from "./components/monitor/MonitoringPage";
 import { DateRange } from "./components/PageHeader";
 import { Language } from "./lib/i18n";
 
@@ -224,12 +222,10 @@ function AppShell() {
                 <TrackingPublicPage language={language} />
               )}
 
-              {activePage === "monitor-dashboard" && <MonitorDashboard />}
+              {activePage === "monitor-dashboard"  && <MonitorDashboard />}
               {activePage === "monitor-companies"  && <CompaniesPage />}
               {activePage === "monitor-products"   && <ProductsPage />}
-              {activePage === "monitor-urls"       && <ProductUrlsPage />}
-              {activePage === "monitor-snapshots"  && <PriceSnapshotsPage />}
-              {activePage === "monitor-syncs"      && <SyncRunsPage />}
+              {activePage === "monitor-monitoring" && <MonitoringPage />}
             </div>
           </main>
         )}

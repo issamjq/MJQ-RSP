@@ -1,10 +1,10 @@
-import { ChartLine, Bell, MessageSquare, Play, Package, Megaphone, LayoutGrid, Shirt, RotateCw, ChevronLeft, ChevronRight, Wallet, ShoppingBag, BarChart3, TrendingUp, Users, Globe, ShieldCheck, Building2, Link2, BarChart2, History } from "lucide-react";
+import { ChartLine, Bell, MessageSquare, Play, Package, Megaphone, LayoutGrid, Shirt, RotateCw, ChevronLeft, ChevronRight, Wallet, ShoppingBag, BarChart3, TrendingUp, Users, Globe, ShieldCheck, Building2, BarChart2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Language, t } from "../lib/i18n";
 import { toast } from "sonner@2.0.3";
 
-export type Page = "dashboard" | "orders" | "purchases" | "wallet" | "notifications" | "messages" | "launcher" | "stock" | "publisher" | "published" | "settings" | "tracking-products" | "tracking-vendors" | "tracking-public" | "monitor-dashboard" | "monitor-companies" | "monitor-products" | "monitor-urls" | "monitor-snapshots" | "monitor-syncs";
+export type Page = "dashboard" | "orders" | "purchases" | "wallet" | "notifications" | "messages" | "launcher" | "stock" | "publisher" | "published" | "settings" | "tracking-products" | "tracking-vendors" | "tracking-public" | "monitor-dashboard" | "monitor-companies" | "monitor-products" | "monitor-monitoring";
 
 interface ModernSidebarProps {
   activePage: Page;
@@ -89,12 +89,10 @@ export function ModernSidebar({
     {
       title: "Price Monitor",
       items: [
-        { id: "monitor-dashboard"  as Page, icon: ShieldCheck, label: "Overview" },
-        { id: "monitor-companies"  as Page, icon: Building2,   label: "Companies" },
-        { id: "monitor-products"   as Page, icon: Package,     label: "Products" },
-        { id: "monitor-urls"       as Page, icon: Link2,       label: "Product URLs" },
-        { id: "monitor-snapshots"  as Page, icon: BarChart2,   label: "Prices" },
-        { id: "monitor-syncs"      as Page, icon: History,     label: "Sync Runs" },
+        { id: "monitor-dashboard"    as Page, icon: ShieldCheck, label: "Overview" },
+        { id: "monitor-companies"    as Page, icon: Building2,   label: "Companies" },
+        { id: "monitor-products"     as Page, icon: Package,     label: "Products" },
+        { id: "monitor-monitoring"   as Page, icon: BarChart2,   label: "Monitoring" },
       ]
     },
   ];
