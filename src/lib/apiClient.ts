@@ -1,11 +1,11 @@
 /**
  * Base API client using native fetch.
  * Reads VITE_API_BASE_URL from environment variables.
- * All requests include JSON headers and return parsed JSON.
+ * Automatically attaches the Firebase ID token to every request.
  */
 
-// In development Vite proxies /api → http://localhost:4000, so BASE_URL is empty.
-// In production set VITE_API_BASE_URL to your Render backend URL.
+import { auth } from "./firebase";
+
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "";
 
 export class ApiError extends Error {
@@ -32,21 +32,30 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return json as T;
 }
 
+/** Get the current user's Firebase ID token (refreshes automatically if expired). */
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const user = auth.currentUser;
+  if (!user) return {};
+  try {
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  } catch {
+    return {};
+  }
+}
+
 /**
- * Fetch with one automatic retry on network errors (CORS/connection failures
- * during Render restarts). API errors (4xx/5xx) are NOT retried.
+ * Fetch with one automatic retry on network errors (handles brief Render restart window).
+ * API errors (4xx/5xx) are NOT retried.
  */
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
   try {
     return await fetch(url, options);
-  } catch (networkErr) {
-    // Wait 2 seconds then retry once — handles brief Render restart window
+  } catch {
     await new Promise(r => setTimeout(r, 2000));
     return fetch(url, options);
   }
 }
-
-const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export async function get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
   let url = `${BASE_URL}${path}`;
@@ -59,32 +68,38 @@ export async function get<T>(path: string, params?: Record<string, string | numb
     if (qs) url += `?${qs}`;
   }
 
-  const res = await fetchWithRetry(url, { headers: JSON_HEADERS });
+  const authHeader = await getAuthHeader();
+  const res = await fetchWithRetry(url, {
+    headers: { "Content-Type": "application/json", ...authHeader },
+  });
   return handleResponse<T>(res);
 }
 
 export async function post<T>(path: string, body?: unknown): Promise<T> {
+  const authHeader = await getAuthHeader();
   const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "POST",
-    headers: JSON_HEADERS,
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handleResponse<T>(res);
 }
 
 export async function put<T>(path: string, body?: unknown): Promise<T> {
+  const authHeader = await getAuthHeader();
   const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "PUT",
-    headers: JSON_HEADERS,
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handleResponse<T>(res);
 }
 
 export async function del<T>(path: string): Promise<T> {
+  const authHeader = await getAuthHeader();
   const res = await fetchWithRetry(`${BASE_URL}${path}`, {
     method: "DELETE",
-    headers: JSON_HEADERS,
+    headers: { "Content-Type": "application/json", ...authHeader },
   });
   return handleResponse<T>(res);
 }

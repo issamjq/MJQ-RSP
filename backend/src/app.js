@@ -6,6 +6,7 @@ const helmet     = require('helmet');
 const morgan     = require('morgan');
 
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { requireAuth }                   = require('./middleware/firebaseAuth');
 
 const companiesRouter         = require('./routes/companies');
 const productsRouter          = require('./routes/products');
@@ -56,7 +57,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ── API Routes ───────────────────────────────────────────────────
+// ── API Routes (all protected by Firebase auth) ──────────────────
+app.use('/api', requireAuth);
 app.use('/api/companies',            companiesRouter);
 app.use('/api/products',             productsRouter);
 app.use('/api/product-company-urls', productCompanyUrlsRouter);
