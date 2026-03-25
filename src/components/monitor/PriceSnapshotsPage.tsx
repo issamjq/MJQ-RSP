@@ -84,15 +84,26 @@ function PdfPrintView({ snapshots, onClose }: { snapshots: PriceSnapshot[]; onCl
       <style>{`
         @media print {
           #root { display: none !important; }
-          #pdf-print-root { display: block !important; }
+          #pdf-print-root {
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            visibility: visible !important;
+          }
           @page { margin: 10mm; size: A4 portrait; }
           #pdf-print-root * { box-sizing: border-box !important; }
         }
-        #pdf-print-root { display: none; }
+        #pdf-print-root {
+          position: absolute;
+          left: -9999px;
+          top: 0;
+          width: 190mm;
+          visibility: hidden;
+        }
       `}</style>
 
       {/* width: 190mm = A4 (210mm) minus 2×10mm margins — renders at true A4 size, no scaling */}
-      <div id="pdf-print-root" style={{ width: "190mm", fontFamily: "Arial, Helvetica, sans-serif", fontSize: "9pt", color: "#111827" }}>
+      <div id="pdf-print-root" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "9pt", color: "#111827" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "3mm", borderBottom: "2px solid #6E76FF", paddingBottom: "2mm" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

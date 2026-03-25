@@ -89,7 +89,7 @@ export interface SyncRun {
   id: number;
   company_id: number | null;
   company_name: string | null;
-  run_type: "single_url" | "company_batch" | "full_batch";
+  run_type: "single_url" | "company_batch" | "full_batch" | "selected_batch";
   status: "running" | "completed" | "failed" | "partial";
   triggered_by: string;
   started_at: string;
@@ -247,10 +247,10 @@ export const scraperApi = {
     api.post<{ success: boolean; message: string }>("/api/scraper/run-company", { company_id: companyId }),
 
   runMany: (urlIds: number[]) =>
-    api.post<{ success: boolean; message: string }>("/api/scraper/run-many", { url_ids: urlIds }),
+    api.post<{ success: boolean; data: { run_id: number; total: number } }>("/api/scraper/run-many", { url_ids: urlIds }),
 
   runAll: () =>
-    api.post<{ success: boolean; message: string }>("/api/scraper/run-all"),
+    api.post<{ success: boolean; data: { run_id: number; total: number } }>("/api/scraper/run-all"),
 };
 
 // ── Auto-Discover ─────────────────────────────────────────────────

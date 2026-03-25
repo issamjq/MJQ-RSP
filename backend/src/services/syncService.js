@@ -181,6 +181,29 @@ async function runMany(urlIds) {
 }
 
 /**
+ * Start scrapes for a specific set of URL IDs — returns run immediately, executes in background.
+ */
+async function startMany(urlIds) {
+  if (!urlIds || !urlIds.length) throw new Error('url_ids array is required');
+
+  const allUrls = await pcuService.getActiveUrls();
+  const urls = allUrls.filter(u => urlIds.includes(u.id));
+  if (!urls.length) throw new Error('No active URLs found for the given IDs');
+
+  const run = await createRun({
+    run_type:     'selected_batch',
+    triggered_by: 'api',
+    meta:         { url_ids: urlIds, url_count: urls.length },
+  });
+
+  _executeBatch(run, urls).catch(err => {
+    logger.error('[SyncService] startMany background error', { runId: run.id, error: err.message });
+  });
+
+  return run;
+}
+
+/**
  * Run scrapes for ALL active URLs across all companies.
  */
 async function runAll() {
@@ -194,6 +217,26 @@ async function runAll() {
   });
 
   return _executeBatch(run, urls);
+}
+
+/**
+ * Start scrapes for ALL active URLs — returns run immediately, executes in background.
+ */
+async function startAll() {
+  const urls = await pcuService.getActiveUrls();
+  if (!urls.length) throw new Error('No active URLs found');
+
+  const run = await createRun({
+    run_type:     'full_batch',
+    triggered_by: 'api',
+    meta:         { url_count: urls.length },
+  });
+
+  _executeBatch(run, urls).catch(err => {
+    logger.error('[SyncService] startAll background error', { runId: run.id, error: err.message });
+  });
+
+  return run;
 }
 
 /**
@@ -220,6 +263,11 @@ async function _executeBatch(run, urls) {
         fail++;
         logger.error('[SyncService] batch item error', { id: urlRecord.id, error: err.message });
       }
+      // Write incremental progress so frontend polling can track it
+      db.query(
+        'UPDATE sync_runs SET success_count=$2, fail_count=$3, total_checked=$4 WHERE id=$1',
+        [run.id, success, fail, success + fail]
+      ).catch(() => {});
     });
 
   } catch (err) {
@@ -258,4 +306,4 @@ async function _executeBatch(run, urls) {
   return finalRun;
 }
 
-module.exports = { createRun, updateRun, getAll, getById, runOne, runCompany, runMany, runAll };
+module.exports = { createRun, updateRun, getAll, getById, runOne, runCompany, runMany, startMany, runAll, startAll };

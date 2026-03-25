@@ -60,15 +60,8 @@ async function runCompany(req, res, next) {
 async function runAll(req, res, next) {
   try {
     logger.info('[ScraperCtrl] runAll triggered');
-
-    syncService.runAll().catch((err) => {
-      logger.error('[ScraperCtrl] runAll background error', { error: err.message });
-    });
-
-    res.json({
-      success: true,
-      message: 'Full sync started. Poll /api/sync-runs for status.',
-    });
+    const run = await syncService.startAll();
+    res.json({ success: true, data: { run_id: run.id, total: Number(run.meta?.url_count ?? 0) } });
   } catch (err) { next(err); }
 }
 
@@ -86,11 +79,8 @@ async function runMany(req, res, next) {
     }
     logger.info('[ScraperCtrl] runMany', { count: urlIds.length });
 
-    syncService.runMany(urlIds.map(Number)).catch((err) => {
-      logger.error('[ScraperCtrl] runMany background error', { error: err.message });
-    });
-
-    res.json({ success: true, message: `Scraping ${urlIds.length} URL(s) started.` });
+    const run = await syncService.startMany(urlIds.map(Number));
+    res.json({ success: true, data: { run_id: run.id, total: Number(run.meta?.url_count ?? urlIds.length) } });
   } catch (err) { next(err); }
 }
 

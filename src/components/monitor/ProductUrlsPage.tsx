@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { Link2, Plus, RefreshCw, Pencil, Trash2, Play, ExternalLink, Check, X, Sparkles, PlayCircle } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Link2, Plus, RefreshCw, Pencil, Trash2, Play, ExternalLink, Check, X, Sparkles, PlayCircle, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner@2.0.3";
@@ -8,11 +8,106 @@ import {
   companiesApi,
   productsApi,
   scraperApi,
+  syncRunsApi,
   type ProductCompanyUrl,
   type Company,
   type Product,
+  type SyncRun,
 } from "../../lib/monitorApi";
 import { DiscoverModal } from "./DiscoverModal";
+
+// ── Scrape Progress Banner ─────────────────────────────────────────
+
+function ScrapeProgressBanner({ runId, total, onDone }: { runId: number; total: number; onDone: () => void }) {
+  const [run, setRun] = useState<SyncRun | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await syncRunsApi.get(runId);
+        setRun(res.data);
+        if (res.data.status !== "running") {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setTimeout(onDone, 4000); // keep banner visible 4s after finishing
+        }
+      } catch { /* silent */ }
+    };
+
+    poll();
+    intervalRef.current = setInterval(poll, 2000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [runId, onDone]);
+
+  const checked   = run?.total_checked ?? 0;
+  const success   = run?.success_count ?? 0;
+  const failed    = run?.fail_count    ?? 0;
+  const totalUrls = total || Number(run?.meta?.url_count ?? 0);
+  const pct       = totalUrls > 0 ? Math.round((checked / totalUrls) * 100) : 0;
+  const isDone    = run && run.status !== "running";
+
+  const statusIcon = !isDone ? null
+    : run?.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+    : run?.status === "partial"   ? <AlertCircle  className="h-4 w-4 text-amber-500" />
+    : <XCircle className="h-4 w-4 text-red-500" />;
+
+  const statusColor = !isDone ? "dark:border-primary/30 border-primary/20"
+    : run?.status === "completed" ? "dark:border-emerald-500/30 border-emerald-200"
+    : run?.status === "partial"   ? "dark:border-amber-500/30 border-amber-200"
+    : "dark:border-red-500/30 border-red-200";
+
+  const barColor = !isDone ? "bg-primary"
+    : run?.status === "completed" ? "bg-emerald-500"
+    : run?.status === "partial"   ? "bg-amber-500"
+    : "bg-red-500";
+
+  return (
+    <div className={`rounded-2xl border ${statusColor} dark:bg-[#12121C] bg-white p-4 transition-all duration-300`}
+      style={{ boxShadow: "0 2px 12px rgba(110,118,255,0.10)" }}>
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          {statusIcon ?? (
+            <span className="flex h-4 w-4 items-center justify-center">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            </span>
+          )}
+          <span className="text-sm font-semibold dark:text-white text-foreground">
+            {!isDone ? "Scraping in progress…"
+              : run?.status === "completed" ? "Scrape complete"
+              : run?.status === "partial"   ? "Scrape finished with some errors"
+              : "Scrape failed"}
+          </span>
+        </div>
+        <span className="text-xs font-mono dark:text-muted-foreground text-muted-foreground">
+          {checked} / {totalUrls || "?"} URLs
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 w-full rounded-full dark:bg-white/10 bg-black/5 overflow-hidden mb-2.5">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {/* Counts */}
+      <div className="flex items-center gap-4 text-xs">
+        <span className="flex items-center gap-1 dark:text-emerald-400 text-emerald-600">
+          <Check className="h-3 w-3" /> {success} success
+        </span>
+        <span className="flex items-center gap-1 dark:text-red-400 text-red-500">
+          <X className="h-3 w-3" /> {failed} failed
+        </span>
+        {!isDone && totalUrls - checked > 0 && (
+          <span className="dark:text-muted-foreground text-muted-foreground">
+            {totalUrls - checked} remaining
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Status Badge ───────────────────────────────────────────────────
 
@@ -187,6 +282,7 @@ export function ProductUrlsPage() {
   const [scraping, setScraping]   = useState<number | null>(null);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [selected, setSelected]   = useState<Set<number>>(new Set());
+  const [activeRun, setActiveRun] = useState<{ runId: number; total: number } | null>(null);
   const [discoverOpen, setDiscoverOpen] = useState(false);
 
   const LIMIT = 25;
@@ -257,8 +353,8 @@ export function ProductUrlsPage() {
     if (selected.size === 0) return;
     setBulkRunning(true);
     try {
-      await scraperApi.runMany(Array.from(selected));
-      toast.success(`Scraping ${selected.size} URL(s) started — check Sync Runs for progress`);
+      const res = await scraperApi.runMany(Array.from(selected));
+      setActiveRun({ runId: res.data.run_id, total: res.data.total });
       setSelected(new Set());
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to start scrape");
@@ -270,8 +366,8 @@ export function ProductUrlsPage() {
   const handleScrapeAll = async () => {
     setBulkRunning(true);
     try {
-      await scraperApi.runAll();
-      toast.success("Scraping all URLs started — check Sync Runs for progress");
+      const res = await scraperApi.runAll();
+      setActiveRun({ runId: res.data.run_id, total: res.data.total });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to start scrape");
     } finally {
@@ -351,6 +447,15 @@ export function ProductUrlsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Live scrape progress */}
+      {activeRun && (
+        <ScrapeProgressBanner
+          runId={activeRun.runId}
+          total={activeRun.total}
+          onDone={() => { setActiveRun(null); load(); }}
+        />
+      )}
 
       {/* Filter */}
       <select className={selectCls} value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
