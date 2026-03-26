@@ -67,8 +67,8 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
     <div className="bg-white border border-gray-100 rounded-2xl p-5 font-mono text-sm shadow-sm">
       <div className="text-gray-400 text-xs mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-3 h-3 text-amber-500" />
-          <span className="text-amber-600 font-semibold">AI Discovery Agent</span>
+          <Sparkles className="w-3 h-3 text-foreground" />
+          <span className="font-semibold text-foreground">AI Discovery Agent</span>
           {!isDone && <span className="text-gray-400">— running</span>}
           {isDone && <span className="text-green-600">— complete</span>}
         </div>
@@ -81,13 +81,13 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
           const tookMs = step.startedAt && step.endedAt ? step.endedAt - step.startedAt : null;
           return (
             <div key={step.id} className="flex items-start gap-2.5">
-              {step.status === 'running' && <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin mt-0.5 shrink-0" />}
+              {step.status === 'running' && <Loader2 className="w-3.5 h-3.5 text-foreground animate-spin mt-0.5 shrink-0" />}
               {step.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />}
               {step.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />}
               {step.status === 'pending' && <Circle className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />}
               <div className="flex items-baseline gap-2 flex-wrap flex-1">
                 <span className={
-                  step.status === 'running' ? 'text-amber-600' :
+                  step.status === 'running' ? 'text-foreground' :
                   step.status === 'done' ? 'text-green-700' :
                   step.status === 'error' ? 'text-red-600' :
                   'text-gray-400'
@@ -205,7 +205,7 @@ export function Discovering() {
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
       <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20 pt-14 md:pt-0">
-        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
 
           {/* Header */}
           <div className="flex items-center gap-3 mb-1">
