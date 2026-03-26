@@ -1,4 +1,4 @@
-import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, Monitor, Shield, Menu, X } from 'lucide-react';
+import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, TrendingUp, Link as LinkIcon, Shield, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { logout } from '../../lib/firebase';
@@ -8,8 +8,9 @@ const NAV_ITEMS = [
   { icon: Shield, label: 'Overview', path: '/overview' },
   { icon: Building2, label: 'Companies', path: '/companies' },
   { icon: Package, label: 'Products', path: '/products' },
-  { icon: Monitor, label: 'Monitoring', path: '/monitoring' },
-  { icon: Compass, label: 'Discovering', path: '/discovering' },
+  { icon: TrendingUp, label: 'Price Board', path: '/price-board' },
+  { icon: LinkIcon, label: 'Tracked URLs', path: '/tracked-urls' },
+  { icon: Compass, label: 'Auto-Discover', path: '/discovering' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
@@ -150,7 +151,7 @@ export function AppSidebar() {
                 <ul className="mt-1 space-y-0.5">
                   <li>
                     <Link to="/discovering" className={lc('/discovering')}>
-                      <Compass className="w-4 h-4" /><span className="text-[13px]">Discovering</span>
+                      <Compass className="w-4 h-4" /><span className="text-[13px]">Auto-Discover</span>
                     </Link>
                   </li>
                 </ul>
@@ -165,9 +166,10 @@ export function AppSidebar() {
                 <ul className="mt-1 space-y-0.5">
                   {[
                     { icon: Shield, label: 'Overview', path: '/overview' },
+                    { icon: TrendingUp, label: 'Price Board', path: '/price-board' },
+                    { icon: LinkIcon, label: 'Tracked URLs', path: '/tracked-urls' },
                     { icon: Building2, label: 'Companies', path: '/companies' },
                     { icon: Package, label: 'Products', path: '/products' },
-                    { icon: Monitor, label: 'Monitoring', path: '/monitoring' },
                   ].map(item => (
                     <li key={item.label}>
                       <Link to={item.path} className={lc(item.path)}>

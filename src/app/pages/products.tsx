@@ -1,4 +1,5 @@
 import { AppSidebar } from '../components/app-sidebar';
+import { Skeleton } from '../components/ui/skeleton';
 import { Package, Search, Grid3x3, List, RefreshCw, Download, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { productsApi } from '../../lib/monitorApi';
@@ -159,7 +160,31 @@ export function Products() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {[...Array(10)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-6 py-3.5 border-b border-gray-50 last:border-0">
+                    <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-full hidden sm:block" />
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            )
           ) : products.length === 0 ? (
             <div className="bg-white rounded-xl p-12 border border-gray-100 shadow-sm text-center">
               <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />

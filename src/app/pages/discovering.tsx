@@ -482,7 +482,7 @@ export function Discovering() {
                       className="flex items-center gap-1.5 px-4 py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors font-medium"
                     >
                       <Sparkles className="w-4 h-4 shrink-0" />
-                      <span>Add {selected.size} to Monitoring</span>
+                      <span>Track {selected.size} Product{selected.size !== 1 ? 's' : ''}</span>
                     </button>
                   )}
                 </div>

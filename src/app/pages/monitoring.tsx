@@ -1,11 +1,10 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Link as LinkIcon, TrendingUp, Clock, Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
-import type { ProductCompanyUrl, PriceSnapshot, SyncRun, Company, Product } from '../../lib/monitorApi';
+import type { ProductCompanyUrl, PriceSnapshot, Company, Product } from '../../lib/monitorApi';
 import { toast } from 'sonner';
-
-type Tab = 'urls' | 'prices' | 'runs';
 
 function formatRelTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -17,12 +16,6 @@ function formatRelTime(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function statusColor(s: string) {
-  if (s === 'completed') return 'bg-green-50 text-green-700';
-  if (s === 'running') return 'bg-blue-50 text-blue-700';
-  if (s === 'failed') return 'bg-red-50 text-red-700';
-  return 'bg-amber-50 text-amber-700';
-}
 
 // ---- Product URLs Tab ----
 function ProductUrlsTab() {
@@ -177,7 +170,20 @@ function ProductUrlsTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0">
+              <Skeleton className="w-4 h-4 rounded shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-32 hidden sm:block" />
+              </div>
+              <Skeleton className="h-4 w-24 hidden md:block" />
+              <Skeleton className="h-6 w-16 rounded-full hidden lg:block" />
+              <Skeleton className="h-8 w-20 rounded-lg" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -335,7 +341,16 @@ function PricesTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <Skeleton className="w-16 h-16 rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-7 w-24 rounded-lg" />
+            </div>
+          ))}
+        </div>
       ) : view === 'latest' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {snapshots.map(snap => (
@@ -397,128 +412,39 @@ function PricesTab() {
   );
 }
 
-// ---- Sync Runs Tab ----
-function SyncRunsTab() {
-  const [runs, setRuns] = useState<SyncRun[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await syncRunsApi.list({ limit: 50 });
-      setRuns(res.data);
-    } catch { toast.error('Failed to load sync runs'); } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const formatDuration = (run: SyncRun) => {
-    if (!run.finished_at) return null;
-    const ms = new Date(run.finished_at).getTime() - new Date(run.started_at).getTime();
-    const s = Math.floor(ms / 1000);
-    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-  };
-
-  const runLabel = (run: SyncRun) => {
-    if (run.run_type === 'full_batch') return 'Full Batch';
-    if (run.run_type === 'selected_batch') return 'Selected Batch';
-    if (run.run_type === 'company_batch') return run.company_name || 'Company Batch';
-    return run.company_name ? `Single · ${run.company_name}` : 'Single URL';
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{runs.length} recent runs</p>
-        <button onClick={load} className="p-2 text-gray-500 hover:bg-white rounded-lg border border-gray-200">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 border-b border-gray-100">
-                <tr>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Type</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Started</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Duration</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Results</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {runs.map(run => (
-                  <tr key={run.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${statusColor(run.status)}`}>{run.status}</span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{runLabel(run)}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground hidden md:table-cell">{formatRelTime(run.started_at)}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground hidden lg:table-cell">{formatDuration(run) || '—'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-sm font-semibold">{run.total_checked}</div>
-                      <div className="text-xs text-muted-foreground">
-                        <span className="text-green-600">{run.success_count}✓</span>
-                        {run.fail_count > 0 && <span className="text-red-500 ml-1">{run.fail_count}✗</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {runs.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">No sync runs yet</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---- Main Monitoring Page ----
-export function Monitoring() {
-  const [tab, setTab] = useState<Tab>('urls');
-
-  const tabs = [
-    { id: 'urls' as Tab, label: 'Product URLs', icon: LinkIcon },
-    { id: 'prices' as Tab, label: 'Prices', icon: TrendingUp },
-    { id: 'runs' as Tab, label: 'Sync Runs', icon: Clock },
-  ];
-
+// ---- Price Board Page ----
+export function PriceBoard() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
       <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20 pt-14 md:pt-0">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-semibold mb-1">Monitoring</h1>
-            <p className="text-sm text-muted-foreground">Real-time price monitoring and scraper management</p>
+            <h1 className="text-2xl font-semibold mb-1">Price Board</h1>
+            <p className="text-sm text-muted-foreground">Live price snapshots across all tracked products and stores</p>
           </div>
-
-          <div className="flex items-center border-b border-gray-200 mb-6 gap-1 overflow-x-auto">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px ${
-                  tab === t.id ? 'border-black text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <t.icon className="w-4 h-4" />
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'urls' && <ProductUrlsTab />}
-          {tab === 'prices' && <PricesTab />}
-          {tab === 'runs' && <SyncRunsTab />}
+          <PricesTab />
         </div>
       </div>
     </div>
   );
 }
+
+// ---- Tracked URLs Page ----
+export function TrackedUrls() {
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <AppSidebar />
+      <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20 pt-14 md:pt-0">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold mb-1">Tracked URLs</h1>
+            <p className="text-sm text-muted-foreground">Manage the store URLs being monitored for each product</p>
+          </div>
+          <ProductUrlsTab />
+        </div>
+      </div>
+    </div>
+  );
+}
+

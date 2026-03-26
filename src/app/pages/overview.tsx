@@ -1,5 +1,6 @@
 import { Building2, Package, Link as LinkIcon, RefreshCw, TrendingUp, Sparkles, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { AppSidebar } from '../components/app-sidebar';
+import { Skeleton } from '../components/ui/skeleton';
 import { useEffect, useState, useCallback } from 'react';
 import { statsApi, syncRunsApi, snapshotsApi, scraperApi } from '../../lib/monitorApi';
 import type { SyncRun, PriceSnapshot } from '../../lib/monitorApi';
@@ -109,12 +110,11 @@ export function Overview() {
   ];
 
   const quickItems = [
-    { title: 'Latest Prices', description: 'Live price board — one price per product per store', icon: TrendingUp, path: '/monitoring' },
-    { title: 'Product URLs', description: 'Manage & scrape store URLs being tracked', icon: LinkIcon, path: '/monitoring' },
-    { title: 'Sync Runs', description: 'Scraper execution history & per-company runs', icon: RefreshCw, path: '/monitoring' },
+    { title: 'Price Board', description: 'Live prices — one snapshot per product per store', icon: TrendingUp, path: '/price-board' },
+    { title: 'Tracked URLs', description: 'Manage the store URLs being monitored', icon: LinkIcon, path: '/tracked-urls' },
     { title: 'Products', description: 'Reference catalog — your internal product list', icon: Package, path: '/products' },
     { title: 'Companies', description: 'Monitored marketplaces & scraper config', icon: Building2, path: '/companies' },
-    { title: 'Auto-Discover', description: 'Find product URLs on any store automatically', icon: Sparkles, path: '/discovering' },
+    { title: 'Auto-Discover', description: 'Find & track product URLs on any store automatically', icon: Sparkles, path: '/discovering' },
   ];
 
   return (
@@ -153,8 +153,17 @@ export function Overview() {
                     <stat.icon className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="text-3xl font-semibold mb-1">{stat.value}</div>
-                <div className="text-xs text-muted-foreground">{stat.subtitle}</div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-9 w-16 mb-2" />
+                    <Skeleton className="h-3 w-24" />
+                  </>
+                ) : (
+                  <>
+                    <div className="text-3xl font-semibold mb-1">{stat.value}</div>
+                    <div className="text-xs text-muted-foreground">{stat.subtitle}</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -191,11 +200,20 @@ export function Overview() {
                   <Clock className="w-4 h-4 text-muted-foreground" />
                   <h3 className="font-semibold text-sm">Recent Sync Runs</h3>
                 </div>
-                <button onClick={() => navigate('/monitoring')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <button onClick={() => navigate('/price-board')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   View all →
                 </button>
               </div>
               <div className="divide-y divide-gray-50">
+                {loading && [...Array(4)].map((_, i) => (
+                  <div key={i} className="px-6 py-3 flex items-center justify-between gap-3">
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="h-8 w-12 rounded-lg" />
+                  </div>
+                ))}
                 {recentRuns.length === 0 && !loading && (
                   <div className="px-6 py-8 text-sm text-muted-foreground text-center">No sync runs yet</div>
                 )}
@@ -233,11 +251,17 @@ export function Overview() {
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
                   <h3 className="font-semibold text-sm">Recent Scrape Errors</h3>
                 </div>
-                <button onClick={() => navigate('/monitoring')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <button onClick={() => navigate('/price-board')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   View prices →
                 </button>
               </div>
               <div className="divide-y divide-gray-50">
+                {loading && [...Array(4)].map((_, i) => (
+                  <div key={i} className="px-6 py-3 space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                ))}
                 {errors.length === 0 && !loading && (
                   <div className="px-6 py-8 text-center">
                     <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-500" />
