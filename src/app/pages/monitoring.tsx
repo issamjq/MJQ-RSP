@@ -1,7 +1,7 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer } from 'lucide-react';
+import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer, ChevronRight } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
 import type { ProductCompanyUrl, PriceSnapshot, Company, Product } from '../../lib/monitorApi';
 import { toast } from 'sonner';
@@ -297,30 +297,67 @@ function ProductUrlsTab() {
 }
 
 // ---- Latest Prices Tab ----
-function printRows(snapshots: PriceSnapshot[], historyMode: 'latest' | 'all') {
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'numeric', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
+
+type DateFilterKey = 'all' | 'today' | 'week' | 'month' | 'custom';
+
+function applyDateFilter(
+  snapshots: PriceSnapshot[],
+  filter: DateFilterKey,
+  start: string,
+  end: string,
+): PriceSnapshot[] {
+  if (filter === 'all') return snapshots;
+  const now = new Date();
+  return snapshots.filter(s => {
+    const d = new Date(s.checked_at);
+    if (filter === 'today') return d.toDateString() === now.toDateString();
+    if (filter === 'week') { const w = new Date(now); w.setDate(w.getDate() - 7); return d >= w; }
+    if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (filter === 'custom' && start && end) {
+      return d >= new Date(start + 'T00:00:00') && d <= new Date(end + 'T23:59:59');
+    }
+    return true;
+  });
+}
+
+const DATE_FILTERS: { key: DateFilterKey; label: string }[] = [
+  { key: 'all', label: 'All Time' },
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'custom', label: 'Custom' },
+];
+
+function printSelected(snapshots: PriceSnapshot[]) {
   const w = window.open('', '_blank');
   if (!w) return;
-  const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const date = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   const rows = snapshots.map((s, i) => {
-    const avail = s.availability?.toLowerCase() ?? '';
-    const color = avail.includes('in stock') || avail === 'in_stock' ? '#16a34a' : avail.includes('out') || avail === 'out_of_stock' ? '#dc2626' : '#d97706';
+    const origCell = s.original_price != null && s.original_price !== s.price
+      ? `<td style="text-decoration:line-through;color:#999">${s.currency ?? ''} ${Number(s.original_price).toFixed(2)}</td>`
+      : '<td style="color:#999">—</td>';
     return `<tr>
       <td>${i + 1}</td>
       <td>${s.internal_name ?? '—'}</td>
       <td>${s.company_name ?? '—'}</td>
       <td style="font-weight:600">${s.price != null ? `${s.currency ?? ''} ${Number(s.price).toFixed(2)}` : '—'}</td>
-      <td style="color:${color}">${s.availability ?? '—'}</td>
-      <td>${formatRelTime(s.checked_at)}</td>
+      ${origCell}
+      <td>${formatDateTime(s.checked_at)}</td>
     </tr>`;
   }).join('');
-
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Price Board — ${date}</title>
+    <title>Live Price Feed — ${date}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#111;padding:24px}
       header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:2px solid #000;padding-bottom:12px}
-      h1{font-size:20px;font-weight:700;letter-spacing:-0.3px}
+      h1{font-size:20px;font-weight:700}
       .meta{font-size:10px;color:#666;text-align:right;line-height:1.6}
       table{width:100%;border-collapse:collapse}
       thead tr{border-bottom:1.5px solid #000}
@@ -330,18 +367,13 @@ function printRows(snapshots: PriceSnapshot[], historyMode: 'latest' | 'all') {
       tr:nth-child(even){background:#fafafa}
       @media print{@page{margin:15mm;size:A4 landscape}body{padding:0}}
     </style></head><body>
-    <header>
-      <div><h1>Price Board</h1></div>
-      <div class="meta">
-        <div>${historyMode === 'latest' ? 'Latest snapshots' : 'Full history'} · ${snapshots.length} item${snapshots.length !== 1 ? 's' : ''}</div>
-        <div>Printed ${date}</div>
-      </div>
+    <header><div><h1>Live Price Feed</h1></div>
+      <div class="meta"><div>${snapshots.length} item${snapshots.length !== 1 ? 's' : ''}</div><div>Exported ${date}</div></div>
     </header>
     <table>
-      <thead><tr><th>#</th><th>Product</th><th>Company</th><th>Price</th><th>Availability</th><th>Last Checked</th></tr></thead>
+      <thead><tr><th>#</th><th>Product</th><th>Store</th><th>Price</th><th>Original</th><th>Checked</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-  </body></html>`);
+    </table></body></html>`);
   w.document.close();
   w.focus();
   setTimeout(() => { w.print(); w.close(); }, 250);
@@ -352,9 +384,15 @@ function PricesTab() {
   const [loading, setLoading] = useState(true);
   const [displayMode, setDisplayMode] = useState<'rows' | 'cards'>('rows');
   const [historyMode, setHistoryMode] = useState<'latest' | 'all'>('latest');
+  const [dateFilter, setDateFilter] = useState<DateFilterKey>('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
+    setSelectedRows(new Set());
     try {
       if (historyMode === 'latest') {
         const res = await snapshotsApi.latest();
@@ -372,52 +410,94 @@ function PricesTab() {
     try { await snapshotsApi.delete(id); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); }
   };
 
-  const availColor = (a: string) => {
-    const l = (a ?? '').toLowerCase();
-    if (l.includes('in stock') || l === 'in_stock') return 'text-green-600';
-    if (l.includes('out') || l === 'out_of_stock') return 'text-red-500';
-    return 'text-amber-500';
-  };
+  const filtered = useMemo(
+    () => applyDateFilter(snapshots, dateFilter, customStart, customEnd),
+    [snapshots, dateFilter, customStart, customEnd],
+  );
+
+  const grouped = useMemo(() => {
+    const m = new Map<string, PriceSnapshot[]>();
+    [...filtered]
+      .sort((a, b) => a.internal_name.localeCompare(b.internal_name))
+      .forEach(s => {
+        if (!m.has(s.internal_name)) m.set(s.internal_name, []);
+        m.get(s.internal_name)!.push(s);
+      });
+    return m;
+  }, [filtered]);
+
+  const flatRows = useMemo(() => Array.from(grouped.values()).flat(), [grouped]);
+
+  const rowIndices = useMemo(() => {
+    const map = new Map<number, number>();
+    flatRows.forEach((s, i) => map.set(s.id, i + 1));
+    return map;
+  }, [flatRows]);
+
+  const allSelected = flatRows.length > 0 && flatRows.every(s => selectedRows.has(s.id));
+  const someSelected = flatRows.some(s => selectedRows.has(s.id));
+  const selectedList = flatRows.filter(s => selectedRows.has(s.id));
+
+  const toggleRow = (id: number) =>
+    setSelectedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const toggleAll = () =>
+    setSelectedRows(allSelected ? new Set() : new Set(flatRows.map(s => s.id)));
+
+  const toggleGroup = (name: string) =>
+    setCollapsedGroups(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
 
   return (
     <div>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        {/* Left: view mode toggle */}
-        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+      {/* Date filter bar */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {DATE_FILTERS.map(opt => (
           <button
-            onClick={() => setDisplayMode('rows')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'rows' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}
+            key={opt.key}
+            onClick={() => setDateFilter(opt.key)}
+            className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${dateFilter === opt.key ? 'bg-black text-white border-black' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
-            <LayoutList className="w-3.5 h-3.5" />
-            <span>List</span>
+            {opt.label}
           </button>
-          <button
-            onClick={() => setDisplayMode('cards')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'cards' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Cards</span>
-          </button>
-        </div>
+        ))}
+        {dateFilter === 'custom' && (
+          <div className="flex items-center gap-2 ml-1">
+            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white" />
+          </div>
+        )}
+      </div>
 
-        {/* Right: history toggle + refresh + PDF */}
+      {/* Main toolbar */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2">
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <button onClick={() => setDisplayMode('rows')} className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'rows' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}>
+              <LayoutList className="w-3.5 h-3.5" /><span>List</span>
+            </button>
+            <button onClick={() => setDisplayMode('cards')} className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'cards' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}>
+              <LayoutGrid className="w-3.5 h-3.5" /><span>Cards</span>
+            </button>
+          </div>
           <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
             <button onClick={() => setHistoryMode('latest')} className={`px-3 py-2 text-sm transition-colors ${historyMode === 'latest' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>Latest</button>
             <button onClick={() => setHistoryMode('all')} className={`px-3 py-2 text-sm transition-colors ${historyMode === 'all' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>All History</button>
           </div>
-          <button onClick={load} className="p-2 hover:bg-white rounded-lg border border-gray-200 text-gray-500 transition-colors">
-            <RefreshCw className="w-4 h-4" />
-          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={load} className="p-2 hover:bg-white rounded-lg border border-gray-200 text-gray-500 transition-colors"><RefreshCw className="w-4 h-4" /></button>
           {displayMode === 'rows' && (
             <button
-              onClick={() => printRows(snapshots, historyMode)}
-              disabled={snapshots.length === 0}
+              onClick={() => printSelected(selectedList)}
+              disabled={selectedList.length === 0}
+              title={selectedList.length === 0 ? 'Select rows to export' : `Export ${selectedList.length} rows`}
               className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-40"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>PDF</span>
+              <span>PDF{selectedList.length > 0 ? ` (${selectedList.length})` : ''}</span>
             </button>
           )}
         </div>
@@ -425,17 +505,18 @@ function PricesTab() {
 
       {/* Loading skeletons */}
       {loading && displayMode === 'rows' && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          {[...Array(7)].map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0">
-              <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-24" />
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center gap-3">
+                <Skeleton className="h-4 w-40" /><Skeleton className="h-4 w-16 ml-2" />
               </div>
-              <Skeleton className="h-5 w-20 hidden sm:block" />
-              <Skeleton className="h-5 w-16 hidden md:block" />
-              <Skeleton className="h-4 w-14 hidden lg:block" />
+              {[...Array(2)].map((_, j) => (
+                <div key={j} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                  <Skeleton className="w-4 h-4 rounded" /><Skeleton className="w-4 h-4 rounded" />
+                  <Skeleton className="h-4 flex-1" /><Skeleton className="h-4 w-20 hidden sm:block" /><Skeleton className="h-4 w-28 hidden lg:block" />
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -444,77 +525,141 @@ function PricesTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-              <Skeleton className="w-16 h-16 rounded-lg" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-              <Skeleton className="h-7 w-24 rounded-lg" />
+              <Skeleton className="w-16 h-16 rounded-lg" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-7 w-24 rounded-lg" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Row / List view */}
+      {/* Grouped list view */}
       {!loading && displayMode === 'rows' && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          {snapshots.length === 0 ? (
-            <div className="py-14 text-center text-sm text-muted-foreground">No price data yet. Run a scrape first.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50/60 border-b border-gray-100">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase w-12">Img</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Company</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Price</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Availability</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Checked</th>
-                    <th className="px-4 py-3 w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {snapshots.map(snap => (
-                    <tr key={snap.id} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-4 py-2.5">
-                        {snap.image_url ? (
-                          <img src={snap.image_url} alt={snap.internal_name} className="w-10 h-10 object-cover rounded-lg bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gray-100" />
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <p className="text-sm font-medium line-clamp-1">{snap.internal_name}</p>
-                        {snap.scrape_status === 'error' && <p className="text-xs text-red-500 truncate max-w-[180px]">{snap.error_message ?? 'scrape error'}</p>}
-                      </td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell text-sm text-muted-foreground">{snap.company_name}</td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-sm font-semibold">
-                          {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
-                        </span>
-                        {snap.original_price != null && snap.original_price !== snap.price && (
-                          <p className="text-xs text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</p>
-                        )}
-                      </td>
-                      <td className={`px-4 py-2.5 text-xs hidden md:table-cell ${availColor(snap.availability ?? '')}`}>{snap.availability ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">{formatRelTime(snap.checked_at)}</td>
-                      <td className="px-4 py-2.5">
-                        <button onClick={() => handleDelete(snap.id)} className="p-1.5 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all">
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-14 text-center text-sm text-muted-foreground">
+            No price data for the selected period.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Select-all bar */}
+            <div className="flex items-center gap-3 px-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onChange={toggleAll}
+                  className="rounded w-4 h-4"
+                />
+                <span>{someSelected ? `${selectedRows.size} selected` : `${filtered.length} items`}</span>
+              </label>
+              {someSelected && (
+                <button onClick={() => setSelectedRows(new Set())} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
+              )}
             </div>
-          )}
-        </div>
+
+            {Array.from(grouped).map(([productName, items]) => {
+              const isCollapsed = collapsedGroups.has(productName);
+              const groupSelectedCount = items.filter(s => selectedRows.has(s.id)).length;
+              const prices = items.filter(s => s.price != null).map(s => Number(s.price));
+              const minP = prices.length ? Math.min(...prices) : null;
+              const maxP = prices.length ? Math.max(...prices) : null;
+              const currency = items[0]?.currency ?? 'AED';
+
+              return (
+                <div key={productName} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div
+                    className="px-4 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                    onClick={() => toggleGroup(productName)}
+                  >
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isCollapsed ? '' : 'rotate-90'}`} />
+                    <span className="font-semibold text-sm flex-1 truncate">{productName}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{items.length} store{items.length !== 1 ? 's' : ''}</span>
+                    {minP !== null && (
+                      <span className="text-xs font-medium shrink-0 hidden sm:block">
+                        {minP === maxP ? `${currency} ${minP.toFixed(2)}` : `${currency} ${minP.toFixed(2)} – ${maxP!.toFixed(2)}`}
+                      </span>
+                    )}
+                    {groupSelectedCount > 0 && (
+                      <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full shrink-0">{groupSelectedCount}</span>
+                    )}
+                  </div>
+
+                  {!isCollapsed && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="border-b border-gray-50">
+                          <tr>
+                            <th className="w-10 px-4 py-2">
+                              <input
+                                type="checkbox"
+                                checked={items.length > 0 && items.every(s => selectedRows.has(s.id))}
+                                ref={el => { if (el) el.indeterminate = items.some(s => selectedRows.has(s.id)) && !items.every(s => selectedRows.has(s.id)); }}
+                                onChange={() => {
+                                  const allChk = items.every(s => selectedRows.has(s.id));
+                                  setSelectedRows(prev => { const n = new Set(prev); items.forEach(s => allChk ? n.delete(s.id) : n.add(s.id)); return n; });
+                                }}
+                                className="rounded w-4 h-4"
+                              />
+                            </th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10">#</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Store</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Price</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Original</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Checked</th>
+                            <th className="w-8 px-3 py-2" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {items.map(snap => {
+                            const idx = rowIndices.get(snap.id) ?? 0;
+                            const isSelected = selectedRows.has(snap.id);
+                            return (
+                              <tr key={snap.id} className={`transition-colors ${isSelected ? 'bg-amber-50/40' : 'hover:bg-gray-50/50'}`}>
+                                <td className="px-4 py-2.5">
+                                  <input type="checkbox" checked={isSelected} onChange={() => toggleRow(snap.id)} className="rounded w-4 h-4" />
+                                </td>
+                                <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums">{idx}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    {snap.image_url && (
+                                      <img src={snap.image_url} alt="" className="w-8 h-8 rounded-lg object-cover bg-gray-100 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    )}
+                                    <span className="text-sm font-medium">{snap.company_name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="text-sm font-semibold">
+                                    {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 hidden md:table-cell">
+                                  {snap.original_price != null && snap.original_price !== snap.price
+                                    ? <span className="text-sm text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</span>
+                                    : <span className="text-sm text-muted-foreground">—</span>}
+                                </td>
+                                <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">{formatDateTime(snap.checked_at)}</td>
+                                <td className="px-3 py-2.5">
+                                  <button onClick={() => handleDelete(snap.id)} className="p-1 hover:bg-red-50 rounded opacity-30 hover:opacity-100 transition-all">
+                                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {/* Cards view */}
       {!loading && displayMode === 'cards' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {snapshots.map(snap => (
+          {filtered.map(snap => (
             <div key={snap.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 group relative hover:shadow-md transition-shadow">
               <button onClick={() => handleDelete(snap.id)} className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 rounded text-red-500">
                 <Trash2 className="w-3.5 h-3.5" />
@@ -524,16 +669,16 @@ function PricesTab() {
               )}
               <p className="text-sm font-medium line-clamp-2 mb-1">{snap.internal_name}</p>
               <p className="text-xs text-muted-foreground mb-2">{snap.company_name}</p>
-              {snap.price != null ? (
-                <p className="text-lg font-semibold">{snap.currency} {Number(snap.price).toFixed(2)}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">No price</p>
+              {snap.price != null
+                ? <p className="text-lg font-semibold">{snap.currency} {Number(snap.price).toFixed(2)}</p>
+                : <p className="text-sm text-muted-foreground">No price</p>}
+              {snap.original_price != null && snap.original_price !== snap.price && (
+                <p className="text-xs text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</p>
               )}
-              <p className={`text-xs mt-1 ${availColor(snap.availability ?? '')}`}>{snap.availability}</p>
-              <p className="text-xs text-muted-foreground mt-2">{formatRelTime(snap.checked_at)}</p>
+              <p className="text-xs text-muted-foreground mt-2">{formatDateTime(snap.checked_at)}</p>
             </div>
           ))}
-          {snapshots.length === 0 && <div className="col-span-full py-12 text-center text-sm text-muted-foreground">No price data yet. Run a scrape first.</div>}
+          {filtered.length === 0 && <div className="col-span-full py-12 text-center text-sm text-muted-foreground">No price data for the selected period.</div>}
         </div>
       )}
     </div>

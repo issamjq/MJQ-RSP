@@ -24,7 +24,7 @@ function parseCsv(text: string): Array<Record<string, string>> {
 }
 
 export function Products() {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

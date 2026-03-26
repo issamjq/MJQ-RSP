@@ -46,6 +46,7 @@ interface DiscoveryContextValue {
   prices: Record<string, PriceSnapshot | null | 'loading'>;
   selected: Set<string>;
   toggle: (id: number) => void;
+  setStoreIds: (ids: number[]) => void;
   toggleSelect: (key: string) => void;
   setSelectedKeys: (keys: string[]) => void;
   handleDiscover: () => Promise<void>;
@@ -105,6 +106,8 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback((id: number) =>
     setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]),
   []);
+
+  const setStoreIds = useCallback((ids: number[]) => setSelectedIds(ids), []);
 
   const toggleSelect = useCallback((key: string) =>
     setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; }),
@@ -287,7 +290,7 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
     <DiscoveryContext.Provider value={{
       companies, phase, query, setQuery, selectedIds,
       logSteps, discoverStartedAt, results, prices, selected,
-      toggle, toggleSelect, setSelectedKeys, handleDiscover, handleSaveSelected, handleNewSearch,
+      toggle, setStoreIds, toggleSelect, setSelectedKeys, handleDiscover, handleSaveSelected, handleNewSearch,
     }}>
       {children}
     </DiscoveryContext.Provider>

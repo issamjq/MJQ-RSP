@@ -56,8 +56,25 @@ function formatDone(ms: number) {
 }
 
 // ── AI Thinking Log ───────────────────────────────────────────────
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s} sec`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m} min ${rem} sec` : `${m} min`;
+}
+
 function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number }) {
   const isDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (isDone) return;
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [isDone]);
+
+  const elapsedMs = !isDone && startedAt ? Date.now() - startedAt : null;
 
   const totalTook = isDone && steps.some(s => s.endedAt)
     ? Math.max(...steps.filter(s => s.endedAt).map(s => s.endedAt!)) - startedAt
@@ -72,22 +89,29 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
           {!isDone && <span className="text-gray-400">— running</span>}
           {isDone && <span className="text-green-600">— complete</span>}
         </div>
-        {isDone && totalTook !== null && (
-          <span className="text-green-600 tabular-nums">finished in {formatDone(totalTook)}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {!isDone && elapsedMs !== null && (
+            <span className="text-amber-500 tabular-nums text-xs">{formatElapsed(elapsedMs)}</span>
+          )}
+          {isDone && totalTook !== null && (
+            <span className="text-green-600 tabular-nums">finished in {formatDone(totalTook)}</span>
+          )}
+        </div>
       </div>
       <div className="space-y-2">
         {steps.map(step => {
           const tookMs = step.startedAt && step.endedAt ? step.endedAt - step.startedAt : null;
           return (
             <div key={step.id} className="flex items-start gap-2.5">
-              {step.status === 'running' && <Loader2 className="w-3.5 h-3.5 text-foreground animate-spin mt-0.5 shrink-0" />}
+              {step.status === 'running' && (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-100 border-t-amber-500 animate-spin mt-0.5 shrink-0" />
+              )}
               {step.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />}
               {step.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />}
               {step.status === 'pending' && <Circle className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />}
               <div className="flex items-baseline gap-2 flex-wrap flex-1">
                 <span className={
-                  step.status === 'running' ? 'text-foreground' :
+                  step.status === 'running' ? 'text-amber-500' :
                   step.status === 'done' ? 'text-green-700' :
                   step.status === 'error' ? 'text-red-600' :
                   'text-gray-400'
@@ -176,7 +200,7 @@ export function Discovering() {
   const {
     companies, phase, query, setQuery, selectedIds,
     logSteps, discoverStartedAt, results, prices, selected,
-    toggle, toggleSelect, setSelectedKeys, handleDiscover, handleSaveSelected, handleNewSearch,
+    toggle, toggleSelect, setSelectedKeys, setStoreIds, handleDiscover, handleSaveSelected, handleNewSearch,
   } = useDiscovery();
 
   // Local UI state only
@@ -315,6 +339,16 @@ export function Discovering() {
                           className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
                           autoFocus
                         />
+                      </div>
+                      <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{companies.length} store{companies.length !== 1 ? 's' : ''}</span>
+                        <button
+                          type="button"
+                          onClick={() => selectedIds.length === companies.length ? setStoreIds([]) : setStoreIds(companies.map(c => c.id))}
+                          className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {selectedIds.length === companies.length ? 'Deselect all' : 'Select all'}
+                        </button>
                       </div>
                       <div className="max-h-52 overflow-y-auto">
                         {filteredCompanies.map(c => (
