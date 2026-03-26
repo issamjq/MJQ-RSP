@@ -259,8 +259,17 @@ export function Discovering() {
 
     await Promise.all(
       targetCompanies.map(async company => {
+        const t1 = setTimeout(() =>
+          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ still working…'),
+          30000
+        );
+        const t2 = setTimeout(() =>
+          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ taking longer than usual, be patient…'),
+          60000
+        );
         try {
           const res = await discoveryApi.search(company.id, query);
+          clearTimeout(t1); clearTimeout(t2);
           const matches = res.data.results;
           allGroups.push({ company, matches });
           updateLog(`scan-${company.id}`, 'done',
@@ -268,6 +277,7 @@ export function Discovering() {
             `→ ${matches.length} product${matches.length !== 1 ? 's' : ''} found`
           );
         } catch {
+          clearTimeout(t1); clearTimeout(t2);
           updateLog(`scan-${company.id}`, 'error', `Scanned ${company.name}`, '→ failed');
         }
       })
@@ -444,35 +454,35 @@ export function Discovering() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 mb-5">
             {phase !== 'search' ? (
               /* Compact summary when processing / review / results */
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-sm font-medium">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
                     {phase === 'processing' && <span className="text-amber-600 mr-2">●</span>}
                     {phase === 'review' && <span className="text-blue-500 mr-2">◆</span>}
                     "{query}"
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
                     {selectedCompanies.map(c => c.name).join(', ')}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {(phase === 'review' || phase === 'results') && (
                     <button
                       onClick={handleNewSearch}
-                      className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shrink-0"
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors"
                     >
                       <Search className="w-3.5 h-3.5" />
-                      New Search
+                      <span>New Search</span>
                     </button>
                   )}
                   {phase === 'review' && (
                     <button
                       onClick={handleSaveSelected}
                       disabled={selected.size === 0}
-                      className="flex items-center gap-2 px-5 py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors shrink-0 font-medium"
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors font-medium"
                     >
-                      <Sparkles className="w-4 h-4" />
-                      Add {selected.size} to Monitoring & Get Prices
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>Add {selected.size} to Monitoring</span>
                     </button>
                   )}
                 </div>
