@@ -349,7 +349,7 @@ function PricesTab() {
               <p className="text-sm font-medium line-clamp-2 mb-1">{snap.internal_name}</p>
               <p className="text-xs text-muted-foreground mb-2">{snap.company_name}</p>
               {snap.price != null ? (
-                <p className="text-lg font-semibold">{snap.currency} {snap.price.toFixed(2)}</p>
+                <p className="text-lg font-semibold">{snap.currency} {Number(snap.price).toFixed(2)}</p>
               ) : (
                 <p className="text-sm text-muted-foreground">No price</p>
               )}
@@ -378,7 +378,7 @@ function PricesTab() {
                   <tr key={snap.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium">{snap.internal_name}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{snap.company_name}</td>
-                    <td className="px-4 py-3 text-sm font-semibold">{snap.price != null ? `${snap.currency} ${snap.price.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-3 text-sm font-semibold">{snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : '—'}</td>
                     <td className={`px-4 py-3 text-xs hidden md:table-cell ${availColor(snap.availability)}`}>{snap.availability}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatRelTime(snap.checked_at)}</td>
                     <td className="px-4 py-3">

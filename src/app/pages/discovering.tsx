@@ -14,7 +14,27 @@ interface LogStep {
   endedAt?: number;
 }
 
-function formatElapsed(ms: number) {
+// Rough estimate of how long each step takes (ms) — used for ETA
+const STEP_ESTIMATES: Record<string, number> = {
+  init: 500,
+  match: 600,
+  save: 1500,
+  price: 30000,  // scraping is the longest
+  default: 5000, // per marketplace scan
+};
+
+function stepEstimate(id: string) {
+  if (id.startsWith('scan-')) return STEP_ESTIMATES.default;
+  return STEP_ESTIMATES[id] ?? STEP_ESTIMATES.default;
+}
+
+function formatEta(ms: number) {
+  if (ms <= 0) return 'almost done';
+  if (ms < 5000) return `~${Math.ceil(ms / 1000)}s`;
+  return `~${Math.ceil(ms / 1000)}s`;
+}
+
+function formatDone(ms: number) {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
@@ -27,15 +47,31 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
 
   useEffect(() => {
     if (isDone) return;
-    const t = setInterval(() => setNow(Date.now()), 200);
+    const t = setInterval(() => setNow(Date.now()), 300);
     return () => clearInterval(t);
   }, [isDone]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [steps]);
 
-  const totalElapsed = isDone
+  // Compute ETA: sum of estimates for pending + remaining time on running steps
+  const eta = (() => {
+    if (isDone) return 0;
+    let remaining = 0;
+    steps.forEach(s => {
+      const est = stepEstimate(s.id);
+      if (s.status === 'pending') {
+        remaining += est;
+      } else if (s.status === 'running' && s.startedAt) {
+        const elapsed = now - s.startedAt;
+        remaining += Math.max(0, est - elapsed);
+      }
+    });
+    return remaining;
+  })();
+
+  const totalTook = isDone && steps.some(s => s.endedAt)
     ? Math.max(...steps.filter(s => s.endedAt).map(s => s.endedAt!)) - startedAt
-    : now - startedAt;
+    : null;
 
   return (
     <div className="bg-gray-950 rounded-2xl p-5 font-mono text-sm">
@@ -44,19 +80,17 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
           <Sparkles className="w-3 h-3 text-amber-400" />
           <span className="text-amber-400 font-semibold">AI Discovery Agent</span>
           {!isDone && <span className="text-gray-500">— running</span>}
-          {isDone && <span className="text-green-500">— done</span>}
+          {isDone && <span className="text-green-500">— complete</span>}
         </div>
-        <span className={isDone ? 'text-green-500' : 'text-amber-400'}>
-          {formatElapsed(totalElapsed)}
-        </span>
+        {isDone && totalTook !== null ? (
+          <span className="text-green-500 tabular-nums">finished in {formatDone(totalTook)}</span>
+        ) : (
+          <span className="text-amber-500 tabular-nums">est. {formatEta(eta)} remaining</span>
+        )}
       </div>
       <div className="space-y-2">
         {steps.map(step => {
-          const elapsed = step.startedAt
-            ? step.endedAt
-              ? step.endedAt - step.startedAt
-              : now - step.startedAt
-            : null;
+          const tookMs = step.startedAt && step.endedAt ? step.endedAt - step.startedAt : null;
 
           return (
             <div key={step.id} className="flex items-start gap-2.5">
@@ -83,15 +117,16 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
                   <span className="text-gray-500 text-xs">{step.detail}</span>
                 )}
               </div>
-              {elapsed !== null && step.status !== 'pending' && (
-                <span className={`text-xs shrink-0 tabular-nums ml-2 ${
-                  step.status === 'running' ? 'text-amber-600' :
-                  step.status === 'done' ? 'text-gray-600' :
-                  'text-red-700'
-                }`}>
-                  {formatElapsed(elapsed)}
+              {/* Show took time when done, or est time when pending */}
+              {tookMs !== null ? (
+                <span className="text-gray-600 text-xs shrink-0 tabular-nums ml-2">
+                  {formatDone(tookMs)}
                 </span>
-              )}
+              ) : step.status === 'pending' ? (
+                <span className="text-gray-700 text-xs shrink-0 tabular-nums ml-2">
+                  est. {formatEta(stepEstimate(step.id))}
+                </span>
+              ) : null}
             </div>
           );
         })}
