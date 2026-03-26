@@ -10,48 +10,91 @@ interface LogStep {
   text: string;
   status: 'pending' | 'running' | 'done' | 'error';
   detail?: string;
+  startedAt?: number;
+  endedAt?: number;
+}
+
+function formatElapsed(ms: number) {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 // ── AI Thinking Log ───────────────────────────────────────────────
-function ThinkingLog({ steps }: { steps: LogStep[] }) {
+function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number }) {
+  const [now, setNow] = useState(Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const isDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
+
+  useEffect(() => {
+    if (isDone) return;
+    const t = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(t);
+  }, [isDone]);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [steps]);
+
+  const totalElapsed = isDone
+    ? Math.max(...steps.filter(s => s.endedAt).map(s => s.endedAt!)) - startedAt
+    : now - startedAt;
 
   return (
     <div className="bg-gray-950 rounded-2xl p-5 font-mono text-sm">
-      <div className="text-gray-500 text-xs mb-4 flex items-center gap-2">
-        <Sparkles className="w-3 h-3 text-amber-400" />
-        <span className="text-amber-400 font-semibold">AI Discovery Agent</span>
-        <span>— running</span>
+      <div className="text-gray-500 text-xs mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3 h-3 text-amber-400" />
+          <span className="text-amber-400 font-semibold">AI Discovery Agent</span>
+          {!isDone && <span className="text-gray-500">— running</span>}
+          {isDone && <span className="text-green-500">— done</span>}
+        </div>
+        <span className={isDone ? 'text-green-500' : 'text-amber-400'}>
+          {formatElapsed(totalElapsed)}
+        </span>
       </div>
       <div className="space-y-2">
-        {steps.map(step => (
-          <div key={step.id} className="flex items-start gap-2.5">
-            {step.status === 'running' && (
-              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin mt-0.5 shrink-0" />
-            )}
-            {step.status === 'done' && (
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
-            )}
-            {step.status === 'error' && (
-              <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-            )}
-            {step.status === 'pending' && (
-              <Circle className="w-3.5 h-3.5 text-gray-600 mt-0.5 shrink-0" />
-            )}
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className={
-                step.status === 'running' ? 'text-amber-300' :
-                step.status === 'done' ? 'text-green-300' :
-                step.status === 'error' ? 'text-red-400' :
-                'text-gray-500'
-              }>{step.text}</span>
-              {step.detail && (
-                <span className="text-gray-500 text-xs">{step.detail}</span>
+        {steps.map(step => {
+          const elapsed = step.startedAt
+            ? step.endedAt
+              ? step.endedAt - step.startedAt
+              : now - step.startedAt
+            : null;
+
+          return (
+            <div key={step.id} className="flex items-start gap-2.5">
+              {step.status === 'running' && (
+                <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin mt-0.5 shrink-0" />
+              )}
+              {step.status === 'done' && (
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+              )}
+              {step.status === 'error' && (
+                <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+              )}
+              {step.status === 'pending' && (
+                <Circle className="w-3.5 h-3.5 text-gray-600 mt-0.5 shrink-0" />
+              )}
+              <div className="flex items-baseline gap-2 flex-wrap flex-1">
+                <span className={
+                  step.status === 'running' ? 'text-amber-300' :
+                  step.status === 'done' ? 'text-green-300' :
+                  step.status === 'error' ? 'text-red-400' :
+                  'text-gray-500'
+                }>{step.text}</span>
+                {step.detail && (
+                  <span className="text-gray-500 text-xs">{step.detail}</span>
+                )}
+              </div>
+              {elapsed !== null && step.status !== 'pending' && (
+                <span className={`text-xs shrink-0 tabular-nums ml-2 ${
+                  step.status === 'running' ? 'text-amber-600' :
+                  step.status === 'done' ? 'text-gray-600' :
+                  'text-red-700'
+                }`}>
+                  {formatElapsed(elapsed)}
+                </span>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div ref={bottomRef} />
     </div>
@@ -103,6 +146,7 @@ export function Discovering() {
 
   // Processing
   const [logSteps, setLogSteps] = useState<LogStep[]>([]);
+  const [discoverStartedAt, setDiscoverStartedAt] = useState<number>(0);
 
   // Results
   const [results, setResults] = useState<DiscoveryGroup[]>([]);
@@ -139,19 +183,33 @@ export function Discovering() {
 
   // Log helpers
   const addLog = useCallback((id: string, text: string, status: LogStep['status'], detail?: string) => {
+    const now = Date.now();
     setLogSteps(prev => {
       if (prev.find(s => s.id === id)) {
-        return prev.map(s => s.id === id ? { ...s, text, status, detail } : s);
+        return prev.map(s => s.id === id ? {
+          ...s, text, status, detail,
+          ...(status === 'running' && !s.startedAt ? { startedAt: now } : {}),
+          ...(status === 'done' || status === 'error' ? { endedAt: now } : {}),
+        } : s);
       }
-      return [...prev, { id, text, status, detail }];
+      return [...prev, {
+        id, text, status, detail,
+        startedAt: status === 'running' ? now : undefined,
+        endedAt: (status === 'done' || status === 'error') ? now : undefined,
+      }];
     });
   }, []);
 
   const updateLog = useCallback((id: string, status: LogStep['status'], text?: string, detail?: string) => {
+    const now = Date.now();
     setLogSteps(prev => prev.map(s =>
-      s.id === id
-        ? { ...s, status, ...(text !== undefined ? { text } : {}), ...(detail !== undefined ? { detail } : {}) }
-        : s
+      s.id === id ? {
+        ...s, status,
+        ...(text !== undefined ? { text } : {}),
+        ...(detail !== undefined ? { detail } : {}),
+        ...(status === 'running' && !s.startedAt ? { startedAt: now } : {}),
+        ...(status === 'done' || status === 'error' ? { endedAt: now } : {}),
+      } : s
     ));
   }, []);
 
@@ -164,6 +222,7 @@ export function Discovering() {
     setLogSteps([]);
     setResults([]);
     setPrices({});
+    setDiscoverStartedAt(Date.now());
 
     const targetCompanies = companies.filter(c => selectedIds.includes(c.id));
 
@@ -497,7 +556,7 @@ export function Discovering() {
           {/* AI thinking log */}
           {logSteps.length > 0 && (
             <div className="mb-5">
-              <ThinkingLog steps={logSteps} />
+              <ThinkingLog steps={logSteps} startedAt={discoverStartedAt} />
             </div>
           )}
 
