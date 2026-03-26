@@ -1,22 +1,54 @@
-import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, TrendingUp, Link as LinkIcon, Shield, Menu, X } from 'lucide-react';
+import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, TrendingUp, Link as LinkIcon, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { logout } from '../../lib/firebase';
 import { toast } from 'sonner';
 
 const NAV_ITEMS = [
-  { icon: Shield, label: 'Overview', path: '/overview' },
-  { icon: Building2, label: 'Companies', path: '/companies' },
+  { icon: Home, label: 'Dashboard', path: '/overview' },
+  { icon: Compass, label: 'Market Discovery', path: '/discovering' },
+  { icon: TrendingUp, label: 'Live Price Feed', path: '/price-board' },
+  { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
   { icon: Package, label: 'Products', path: '/products' },
-  { icon: TrendingUp, label: 'Price Board', path: '/price-board' },
-  { icon: LinkIcon, label: 'Tracked URLs', path: '/tracked-urls' },
-  { icon: Compass, label: 'Auto-Discover', path: '/discovering' },
+  { icon: Building2, label: 'Stores', path: '/companies' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
+const SECTIONS = [
+  {
+    key: 'ai',
+    label: 'AI',
+    items: [
+      { icon: Compass, label: 'Market Discovery', path: '/discovering' },
+    ],
+  },
+  {
+    key: 'monitoring',
+    label: 'Monitoring',
+    items: [
+      { icon: TrendingUp, label: 'Live Price Feed', path: '/price-board' },
+      { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
+    ],
+  },
+  {
+    key: 'catalog',
+    label: 'Catalog',
+    items: [
+      { icon: Package, label: 'Products', path: '/products' },
+      { icon: Building2, label: 'Stores', path: '/companies' },
+    ],
+  },
+  {
+    key: 'system',
+    label: 'System',
+    items: [
+      { icon: Settings, label: 'Settings', path: '/settings' },
+    ],
+  },
+];
+
 export function AppSidebar() {
-  const [aiToolsOpen, setAiToolsOpen] = useState(true);
-  const [priceMonitorOpen, setPriceMonitorOpen] = useState(true);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ ai: true, monitoring: true, catalog: true, system: true });
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -28,6 +60,9 @@ export function AppSidebar() {
     try { await logout(); navigate('/'); }
     catch { toast.error('Logout failed'); }
   };
+
+  const toggleSection = (key: string) =>
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   const isActive = (path: string) => location.pathname === path;
   const lc = (path: string) =>
@@ -135,60 +170,38 @@ export function AppSidebar() {
             </div>
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
-            <ul className="space-y-0.5">
+            {/* Dashboard — standalone */}
+            <ul className="space-y-0.5 mb-4">
               <li>
                 <Link to="/overview" className={lc('/overview')}>
-                  <Home className="w-4 h-4" /><span className="text-[13px]">Home</span>
+                  <Home className="w-4 h-4" /><span className="text-[13px]">Dashboard</span>
                 </Link>
               </li>
             </ul>
-            <div className="mt-6">
-              <button onClick={() => setAiToolsOpen(!aiToolsOpen)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent/30 rounded-lg transition-colors">
-                <span className="font-medium">AI tools</span>
-                <ChevronDown className={'w-3 h-3 ml-auto transition-transform ' + (aiToolsOpen ? 'rotate-180' : '')} />
-              </button>
-              {aiToolsOpen && (
-                <ul className="mt-1 space-y-0.5">
-                  <li>
-                    <Link to="/discovering" className={lc('/discovering')}>
-                      <Compass className="w-4 h-4" /><span className="text-[13px]">Auto-Discover</span>
-                    </Link>
-                  </li>
-                </ul>
-              )}
-            </div>
-            <div className="mt-6">
-              <button onClick={() => setPriceMonitorOpen(!priceMonitorOpen)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent/30 rounded-lg transition-colors">
-                <span className="font-medium">Price Monitor</span>
-                <ChevronDown className={'w-3 h-3 ml-auto transition-transform ' + (priceMonitorOpen ? 'rotate-180' : '')} />
-              </button>
-              {priceMonitorOpen && (
-                <ul className="mt-1 space-y-0.5">
-                  {[
-                    { icon: Shield, label: 'Overview', path: '/overview' },
-                    { icon: TrendingUp, label: 'Price Board', path: '/price-board' },
-                    { icon: LinkIcon, label: 'Tracked URLs', path: '/tracked-urls' },
-                    { icon: Building2, label: 'Companies', path: '/companies' },
-                    { icon: Package, label: 'Products', path: '/products' },
-                  ].map(item => (
-                    <li key={item.label}>
-                      <Link to={item.path} className={lc(item.path)}>
-                        <item.icon className="w-4 h-4" /><span className="text-[13px]">{item.label}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="mt-6">
-              <ul className="space-y-0.5">
-                <li>
-                  <Link to="/settings" className={lc('/settings')}>
-                    <Settings className="w-4 h-4" /><span className="text-[13px]">Settings</span>
-                  </Link>
-                </li>
-              </ul>
-            </div>
+
+            {/* Grouped sections */}
+            {SECTIONS.map(section => (
+              <div key={section.key} className="mb-4">
+                <button
+                  onClick={() => toggleSection(section.key)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors rounded-lg hover:bg-accent/20"
+                >
+                  <span>{section.label}</span>
+                  <ChevronDown className={'w-3 h-3 ml-auto transition-transform ' + (openSections[section.key] ? 'rotate-180' : '')} />
+                </button>
+                {openSections[section.key] && (
+                  <ul className="mt-1 space-y-0.5">
+                    {section.items.map(item => (
+                      <li key={item.path}>
+                        <Link to={item.path} className={lc(item.path)}>
+                          <item.icon className="w-4 h-4" /><span className="text-[13px]">{item.label}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
           </nav>
           <div className="p-4 mt-auto">
             <div className="space-y-1">

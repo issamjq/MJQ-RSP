@@ -110,11 +110,11 @@ export function Overview() {
   ];
 
   const quickItems = [
-    { title: 'Price Board', description: 'Live prices — one snapshot per product per store', icon: TrendingUp, path: '/price-board' },
-    { title: 'Tracked URLs', description: 'Manage the store URLs being monitored', icon: LinkIcon, path: '/tracked-urls' },
+    { title: 'Live Price Feed', description: 'Live prices — one snapshot per product per store', icon: TrendingUp, path: '/price-board' },
+    { title: 'Tracked Listings', description: 'Manage the store URLs being monitored', icon: LinkIcon, path: '/tracked-urls' },
     { title: 'Products', description: 'Reference catalog — your internal product list', icon: Package, path: '/products' },
-    { title: 'Companies', description: 'Monitored marketplaces & scraper config', icon: Building2, path: '/companies' },
-    { title: 'Auto-Discover', description: 'Find & track product URLs on any store automatically', icon: Sparkles, path: '/discovering' },
+    { title: 'Stores', description: 'Monitored marketplaces & scraper config', icon: Building2, path: '/companies' },
+    { title: 'Market Discovery', description: 'Find & track product URLs on any store automatically', icon: Sparkles, path: '/discovering' },
   ];
 
   return (
@@ -124,7 +124,7 @@ export function Overview() {
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
             <div>
-              <h1 className="text-2xl font-semibold mb-1">Home</h1>
+              <h1 className="text-2xl font-semibold mb-1">Dashboard</h1>
               <p className="text-sm text-muted-foreground">
                 Price monitoring across {stats.companies} companies · {stats.tracked_urls} active tracked URLs
               </p>

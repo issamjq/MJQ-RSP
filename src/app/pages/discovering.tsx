@@ -210,7 +210,7 @@ export function Discovering() {
           {/* Header */}
           <div className="flex items-center gap-3 mb-1">
             <Compass className="w-6 h-6" />
-            <h1 className="text-2xl font-semibold">Discovering</h1>
+            <h1 className="text-2xl font-semibold">Market Discovery</h1>
           </div>
           <p className="text-sm text-muted-foreground mb-6">
             AI-powered product discovery — finds, matches, saves, and prices everything in one click
