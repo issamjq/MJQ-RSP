@@ -15,20 +15,46 @@ export function Overview() {
   const [runningAll, setRunningAll] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const [statsRes, runsRes, errorsRes] = await Promise.all([
-        statsApi.get(),
-        syncRunsApi.list({ limit: 5 }),
-        snapshotsApi.list({ scrape_status: 'error', limit: 5 }),
-      ]);
-      setStats(statsRes.data);
-      setRecentRuns(runsRes.data);
-      setErrors(errorsRes.data);
-    } catch {
-      // silent — show stale data
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    const [statsRes, runsRes, errorsRes] = await Promise.allSettled([
+      statsApi.get(),
+      syncRunsApi.list({ limit: 5 }),
+      snapshotsApi.list({ scrape_status: 'error', limit: 5 }),
+    ]);
+
+    if (statsRes.status === 'fulfilled') {
+      setStats(statsRes.value.data);
+    } else {
+      console.error('Stats failed:', statsRes.reason);
+      // Fall back: derive counts from other data if stats endpoint missing
+      try {
+        const [companiesRes, productsRes, urlsRes] = await Promise.allSettled([
+          import('../../lib/monitorApi').then(m => m.companiesApi.list()),
+          import('../../lib/monitorApi').then(m => m.productsApi.list({ limit: 1 })),
+          import('../../lib/monitorApi').then(m => m.urlsApi.list({ limit: 1 })),
+        ]);
+        setStats(prev => ({
+          ...prev,
+          companies: companiesRes.status === 'fulfilled' ? companiesRes.value.data.length : prev.companies,
+          products: productsRes.status === 'fulfilled' ? productsRes.value.total : prev.products,
+          tracked_urls: urlsRes.status === 'fulfilled' ? urlsRes.value.total : prev.tracked_urls,
+        }));
+      } catch { /* keep zeros */ }
     }
+
+    if (runsRes.status === 'fulfilled') {
+      setRecentRuns(runsRes.value.data);
+    } else {
+      console.error('Sync runs failed:', runsRes.reason);
+    }
+
+    if (errorsRes.status === 'fulfilled') {
+      setErrors(errorsRes.value.data);
+    } else {
+      console.error('Errors fetch failed:', errorsRes.reason);
+    }
+
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
