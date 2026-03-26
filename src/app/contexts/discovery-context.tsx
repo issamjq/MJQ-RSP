@@ -137,11 +137,11 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
     await Promise.all(
       targetCompanies.map(async company => {
         const t1 = setTimeout(() =>
-          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ still working…'),
+          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, 'still working…'),
           30000
         );
         const t2 = setTimeout(() =>
-          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ taking longer than usual, be patient…'),
+          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, 'taking longer than usual, be patient…'),
           60000
         );
         try {
