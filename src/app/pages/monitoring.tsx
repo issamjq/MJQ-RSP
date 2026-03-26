@@ -1,5 +1,5 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
@@ -297,15 +297,66 @@ function ProductUrlsTab() {
 }
 
 // ---- Latest Prices Tab ----
+function printRows(snapshots: PriceSnapshot[], historyMode: 'latest' | 'all') {
+  const w = window.open('', '_blank');
+  if (!w) return;
+  const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const rows = snapshots.map((s, i) => {
+    const avail = s.availability?.toLowerCase() ?? '';
+    const color = avail.includes('in stock') || avail === 'in_stock' ? '#16a34a' : avail.includes('out') || avail === 'out_of_stock' ? '#dc2626' : '#d97706';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${s.internal_name ?? '—'}</td>
+      <td>${s.company_name ?? '—'}</td>
+      <td style="font-weight:600">${s.price != null ? `${s.currency ?? ''} ${Number(s.price).toFixed(2)}` : '—'}</td>
+      <td style="color:${color}">${s.availability ?? '—'}</td>
+      <td>${formatRelTime(s.checked_at)}</td>
+    </tr>`;
+  }).join('');
+
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Price Board — ${date}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#111;padding:24px}
+      header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:2px solid #000;padding-bottom:12px}
+      h1{font-size:20px;font-weight:700;letter-spacing:-0.3px}
+      .meta{font-size:10px;color:#666;text-align:right;line-height:1.6}
+      table{width:100%;border-collapse:collapse}
+      thead tr{border-bottom:1.5px solid #000}
+      th{text-align:left;padding:7px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#555}
+      td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+      tr:last-child td{border-bottom:none}
+      tr:nth-child(even){background:#fafafa}
+      @media print{@page{margin:15mm;size:A4 landscape}body{padding:0}}
+    </style></head><body>
+    <header>
+      <div><h1>Price Board</h1></div>
+      <div class="meta">
+        <div>${historyMode === 'latest' ? 'Latest snapshots' : 'Full history'} · ${snapshots.length} item${snapshots.length !== 1 ? 's' : ''}</div>
+        <div>Printed ${date}</div>
+      </div>
+    </header>
+    <table>
+      <thead><tr><th>#</th><th>Product</th><th>Company</th><th>Price</th><th>Availability</th><th>Last Checked</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); w.close(); }, 250);
+}
+
 function PricesTab() {
   const [snapshots, setSnapshots] = useState<PriceSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'latest' | 'all'>('latest');
+  const [displayMode, setDisplayMode] = useState<'rows' | 'cards'>('rows');
+  const [historyMode, setHistoryMode] = useState<'latest' | 'all'>('latest');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (view === 'latest') {
+      if (historyMode === 'latest') {
         const res = await snapshotsApi.latest();
         setSnapshots(res.data);
       } else {
@@ -313,7 +364,7 @@ function PricesTab() {
         setSnapshots(res.data);
       }
     } catch { toast.error('Failed to load prices'); } finally { setLoading(false); }
-  }, [view]);
+  }, [historyMode]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -322,7 +373,7 @@ function PricesTab() {
   };
 
   const availColor = (a: string) => {
-    const l = a.toLowerCase();
+    const l = (a ?? '').toLowerCase();
     if (l.includes('in stock') || l === 'in_stock') return 'text-green-600';
     if (l.includes('out') || l === 'out_of_stock') return 'text-red-500';
     return 'text-amber-500';
@@ -330,17 +381,66 @@ function PricesTab() {
 
   return (
     <div>
+      {/* Toolbar */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-          <button onClick={() => setView('latest')} className={`px-4 py-2 text-sm transition-colors ${view === 'latest' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>Latest</button>
-          <button onClick={() => setView('all')} className={`px-4 py-2 text-sm transition-colors ${view === 'all' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>All History</button>
+        {/* Left: view mode toggle */}
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <button
+            onClick={() => setDisplayMode('rows')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'rows' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            <span>List</span>
+          </button>
+          <button
+            onClick={() => setDisplayMode('cards')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${displayMode === 'cards' ? 'bg-black text-white' : 'hover:bg-gray-50 text-gray-600'}`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Cards</span>
+          </button>
         </div>
-        <button onClick={load} className="p-2 text-gray-500 hover:bg-white rounded-lg border border-gray-200">
-          <RefreshCw className="w-4 h-4" />
-        </button>
+
+        {/* Right: history toggle + refresh + PDF */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <button onClick={() => setHistoryMode('latest')} className={`px-3 py-2 text-sm transition-colors ${historyMode === 'latest' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>Latest</button>
+            <button onClick={() => setHistoryMode('all')} className={`px-3 py-2 text-sm transition-colors ${historyMode === 'all' ? 'bg-black text-white' : 'hover:bg-gray-50'}`}>All History</button>
+          </div>
+          <button onClick={load} className="p-2 hover:bg-white rounded-lg border border-gray-200 text-gray-500 transition-colors">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          {displayMode === 'rows' && (
+            <button
+              onClick={() => printRows(snapshots, historyMode)}
+              disabled={snapshots.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-40"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading ? (
+      {/* Loading skeletons */}
+      {loading && displayMode === 'rows' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {[...Array(7)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0">
+              <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-5 w-20 hidden sm:block" />
+              <Skeleton className="h-5 w-16 hidden md:block" />
+              <Skeleton className="h-4 w-14 hidden lg:block" />
+            </div>
+          ))}
+        </div>
+      )}
+      {loading && displayMode === 'cards' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
@@ -351,7 +451,68 @@ function PricesTab() {
             </div>
           ))}
         </div>
-      ) : view === 'latest' ? (
+      )}
+
+      {/* Row / List view */}
+      {!loading && displayMode === 'rows' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {snapshots.length === 0 ? (
+            <div className="py-14 text-center text-sm text-muted-foreground">No price data yet. Run a scrape first.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50/60 border-b border-gray-100">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase w-12">Img</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Company</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Price</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Availability</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Checked</th>
+                    <th className="px-4 py-3 w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {snapshots.map(snap => (
+                    <tr key={snap.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-4 py-2.5">
+                        {snap.image_url ? (
+                          <img src={snap.image_url} alt={snap.internal_name} className="w-10 h-10 object-cover rounded-lg bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gray-100" />
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <p className="text-sm font-medium line-clamp-1">{snap.internal_name}</p>
+                        {snap.scrape_status === 'error' && <p className="text-xs text-red-500 truncate max-w-[180px]">{snap.error_message ?? 'scrape error'}</p>}
+                      </td>
+                      <td className="px-4 py-2.5 hidden sm:table-cell text-sm text-muted-foreground">{snap.company_name}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-sm font-semibold">
+                          {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
+                        </span>
+                        {snap.original_price != null && snap.original_price !== snap.price && (
+                          <p className="text-xs text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</p>
+                        )}
+                      </td>
+                      <td className={`px-4 py-2.5 text-xs hidden md:table-cell ${availColor(snap.availability ?? '')}`}>{snap.availability ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">{formatRelTime(snap.checked_at)}</td>
+                      <td className="px-4 py-2.5">
+                        <button onClick={() => handleDelete(snap.id)} className="p-1.5 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all">
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Cards view */}
+      {!loading && displayMode === 'cards' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {snapshots.map(snap => (
             <div key={snap.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 group relative hover:shadow-md transition-shadow">
@@ -368,44 +529,11 @@ function PricesTab() {
               ) : (
                 <p className="text-sm text-muted-foreground">No price</p>
               )}
-              <p className={`text-xs mt-1 ${availColor(snap.availability)}`}>{snap.availability}</p>
+              <p className={`text-xs mt-1 ${availColor(snap.availability ?? '')}`}>{snap.availability}</p>
               <p className="text-xs text-muted-foreground mt-2">{formatRelTime(snap.checked_at)}</p>
             </div>
           ))}
           {snapshots.length === 0 && <div className="col-span-full py-12 text-center text-sm text-muted-foreground">No price data yet. Run a scrape first.</div>}
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 border-b border-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Company</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Price</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Availability</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Checked</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {snapshots.map(snap => (
-                  <tr key={snap.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium">{snap.internal_name}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{snap.company_name}</td>
-                    <td className="px-4 py-3 text-sm font-semibold">{snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : '—'}</td>
-                    <td className={`px-4 py-3 text-xs hidden md:table-cell ${availColor(snap.availability)}`}>{snap.availability}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatRelTime(snap.checked_at)}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleDelete(snap.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors">
-                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
     </div>
