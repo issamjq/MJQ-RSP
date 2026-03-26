@@ -1,463 +1,289 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Package, Search, Grid3x3, List, RefreshCw, Download, Plus, Edit, Trash2, MoreVertical, X } from 'lucide-react';
-import { useState } from 'react';
+import { Package, Search, Grid3x3, List, RefreshCw, Download, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { productsApi } from '../../lib/monitorApi';
+import type { Product } from '../../lib/monitorApi';
+import { toast } from 'sonner';
+
+function parseCsv(text: string): Array<Record<string, string>> {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+  return lines.slice(1).map(line => {
+    const vals: string[] = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { vals.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    vals.push(cur);
+    return Object.fromEntries(headers.map((h, i) => [h, (vals[i] || '').trim()]));
+  });
+}
 
 export function Products() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '' });
+  const csvRef = useRef<HTMLInputElement>(null);
 
-  const products = [
-    {
-      id: 1,
-      name: 'AXIS-Y Artichoke Intensive Skin Barrier Ampoule 30ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-12967243',
-      barcode: '#03758AR-GRF-4DY',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=300&h=300&fit=crop',
-      price: 'AED 125.00',
-      stock: 45
-    },
-    {
-      id: 2,
-      name: 'AXIS-Y CALAMINE Pore Control Capsule Serum 50ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-34434535',
-      barcode: '#779F91F-5RR-6DC',
-      image: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=300&h=300&fit=crop',
-      price: 'AED 98.00',
-      stock: 32
-    },
-    {
-      id: 3,
-      name: 'AXIS-Y Daily Purifying Treatment Toner 200ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-1456-7924',
-      barcode: '#F5718AA1-RCX-4ZBF',
-      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop',
-      price: 'AED 87.00',
-      stock: 28
-    },
-    {
-      id: 4,
-      name: 'AXIS-Y Dark Spot Correcting Glow Cream 50ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-34541258',
-      barcode: '#B1EF409E-99X1-4CX-R',
-      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300&h=300&fit=crop',
-      price: 'AED 112.00',
-      stock: 18
-    },
-    {
-      id: 5,
-      name: 'AXIS-Y Dark Spot Correcting Glow Toner 125ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-54564894',
-      barcode: '#0AMVD79-A-QLL-2T16',
-      image: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=300&h=300&fit=crop',
-      price: 'AED 76.00',
-      stock: 56
-    },
-    {
-      id: 6,
-      name: 'AXIS-Y Heartleaf My Type Calming Cream 60ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-49323333',
-      barcode: '#S1T153MG-GTCZ-4ZY',
-      image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=300&h=300&fit=crop',
-      price: 'AED 95.00',
-      stock: 41
-    },
-    {
-      id: 7,
-      name: 'AXIS-Y Mugwort Green Vital Energy Complex Sheet Mask',
-      brand: 'Axis-Y',
-      sku: '#SKU-90541238',
-      barcode: '#186A7A52-TGLZ-5RS1',
-      image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=300&h=300&fit=crop',
-      price: 'AED 15.00',
-      stock: 120
-    },
-    {
-      id: 8,
-      name: 'AXIS-Y Mugwort Pore Clarifying Wash Off Pack 100ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-89745623',
-      barcode: '#34JM712G-5GF7-56AA',
-      image: 'https://images.unsplash.com/photo-1615397349754-0e6d8a75bc04?w=300&h=300&fit=crop',
-      price: 'AED 68.00',
-      stock: 37
-    },
-    {
-      id: 9,
-      name: 'AXIS-Y New Skin Resolution Gel Mask 100ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-78945612',
-      barcode: '#PK4193A9-PRG-978S',
-      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300&h=300&fit=crop',
-      price: 'AED 82.00',
-      stock: 29
-    },
-    {
-      id: 10,
-      name: 'AXIS-Y New Skin Resolution Gel Mask 50ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-56412387',
-      barcode: '#04M3KRAE-9EZ7-4AB2',
-      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop',
-      price: 'AED 55.00',
-      stock: 63
-    },
-    {
-      id: 11,
-      name: 'AXIS-Y PANTHENOL 10 Skin Smoothing Face Shield Cream',
-      brand: 'Axis-Y',
-      sku: '#SKU-71024587',
-      barcode: '#A62SRG4-5XD6-97HL',
-      image: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=300&h=300&fit=crop',
-      price: 'AED 104.00',
-      stock: 22
-    },
-    {
-      id: 12,
-      name: 'AXIS-Y Spot the Difference Blemish Treatment 15ml',
-      brand: 'Axis-Y',
-      sku: '#SKU-98745632',
-      barcode: '#A1PTAQM8-3-23I-RQX',
-      image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=300&h=300&fit=crop',
-      price: 'AED 45.00',
-      stock: 88
-    },
-  ];
+  const load = useCallback(async (q?: string) => {
+    setLoading(true);
+    try {
+      const res = await productsApi.list({ search: q || search, limit: 200 });
+      setProducts(res.data);
+      setTotal(res.total);
+    } catch {
+      toast.error('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.barcode.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    const t = setTimeout(() => load(search), 300);
+    return () => clearTimeout(t);
+  }, [search, load]);
+
+  const openAdd = () => {
+    setEditTarget(null);
+    setForm({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '' });
+    setShowModal(true);
+  };
+
+  const openEdit = (p: Product) => {
+    setEditTarget(p);
+    setForm({ internal_name: p.internal_name, brand: p.brand || '', internal_sku: p.internal_sku || '', barcode: p.barcode || '', image_url: p.image_url || '' });
+    setShowModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.internal_name.trim()) { toast.error('Product name is required'); return; }
+    setSaving(true);
+    try {
+      if (editTarget) {
+        await productsApi.update(editTarget.id, { internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined });
+        toast.success('Product updated');
+      } else {
+        await productsApi.create({ internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined });
+        toast.success('Product added');
+      }
+      setShowModal(false);
+      load();
+    } catch {
+      toast.error('Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (p: Product) => {
+    if (!confirm(`Delete "${p.internal_name}"?`)) return;
+    try {
+      await productsApi.delete(p.id);
+      toast.success('Deleted');
+      load();
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const rows = parseCsv(text);
+    const mapped = rows
+      .filter(r => r['Item Name'] || r['internal_name'])
+      .map(r => ({
+        internal_name: r['Item Name'] || r['internal_name'] || '',
+        internal_sku: r['Id'] || r['internal_sku'] || '',
+        barcode: r['SKU'] || r['barcode'] || '',
+        brand: r['Brand'] || r['brand'] || '',
+        image_url: r['ImageUrl'] || r['image_url'] || '',
+        is_active: (r['Is Visible'] || r['is_active'] || 'true').toLowerCase() !== 'false',
+      }))
+      .filter(r => r.internal_name);
+    if (!mapped.length) { toast.error('No valid rows found'); return; }
+    try {
+      const res = await productsApi.import(mapped);
+      toast.success(`Imported ${res.data.inserted} new, updated ${res.data.updated}`);
+      load();
+    } catch {
+      toast.error('Import failed');
+    }
+    if (csvRef.current) csvRef.current.value = '';
+  };
+
+  const brandColors = ['bg-green-50 text-green-700 border-green-200', 'bg-blue-50 text-blue-700 border-blue-200', 'bg-purple-50 text-purple-700 border-purple-200', 'bg-orange-50 text-orange-700 border-orange-200', 'bg-pink-50 text-pink-700 border-pink-200'];
+  const brandColor = (brand: string) => brandColors[Math.abs(brand.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % brandColors.length];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
       <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20">
-        <div className="max-w-7xl mx-auto p-8">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-semibold">Products</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {filteredProducts.length} products · reference catalog
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">{total} products · reference catalog</p>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                <Grid3x3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                <List className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}><Grid3x3 className="w-4 h-4" /></button>
+              <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}><List className="w-4 h-4" /></button>
               <div className="w-px h-6 bg-gray-200 mx-1" />
-              <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors">
-                <RefreshCw className="w-4 h-4" />
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">
+              <button onClick={() => load()} className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /></button>
+              <button onClick={() => csvRef.current?.click()} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">
                 <Download className="w-4 h-4" />
                 Import CSV
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm" onClick={() => setShowAddModal(true)}>
+              <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm">
                 <Plus className="w-4 h-4" />
                 Add
               </button>
+              <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
             </div>
           </div>
 
-          {/* Search */}
           <div className="relative mb-6">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search name, SKU, barcode..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-            />
+            <input type="text" placeholder="Search name, SKU, barcode, brand..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
           </div>
 
-          {/* Grid View */}
-          {viewMode === 'grid' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
-              {filteredProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all group"
-                >
-                  {/* Product Image */}
+          {loading ? (
+            <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          ) : products.length === 0 ? (
+            <div className="bg-white rounded-xl p-12 border border-gray-100 shadow-sm text-center">
+              <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <h2 className="text-lg font-semibold mb-2">No products found</h2>
+              <p className="text-sm text-muted-foreground">Try adjusting your search query</p>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {products.map((product) => (
+                <div key={product.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all group">
                   <div className="aspect-square bg-gray-50 relative overflow-hidden">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {/* Hover Actions */}
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.internal_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-10 h-10 text-gray-300" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors">
-                        <Edit className="w-4 h-4 text-gray-700" />
-                      </button>
-                      <button className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors">
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </button>
+                      <button onClick={() => openEdit(product)} className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"><Edit className="w-4 h-4 text-gray-700" /></button>
+                      <button onClick={() => handleDelete(product)} className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"><Trash2 className="w-4 h-4 text-red-600" /></button>
                     </div>
                   </div>
-                  
-                  {/* Product Info */}
                   <div className="p-4">
-                    <div className="mb-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                        {product.brand}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-medium mb-2 line-clamp-2 min-h-[2.5rem]">
-                      {product.name}
-                    </h3>
+                    {product.brand && (
+                      <div className="mb-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${brandColor(product.brand)}`}>{product.brand}</span>
+                      </div>
+                    )}
+                    <h3 className="text-sm font-medium mb-2 line-clamp-2 min-h-[2.5rem]">{product.internal_name}</h3>
                     <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>{product.sku}</p>
-                      <p>{product.barcode}</p>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {product.price}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Stock: {product.stock}
-                      </span>
+                      {product.internal_sku && <p>{product.internal_sku}</p>}
+                      {product.barcode && <p>{product.barcode}</p>}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-
-          {/* List View */}
-          {viewMode === 'list' && (
+          ) : (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50/50 border-b border-gray-100">
-                  <tr>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Product
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Brand
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      SKU
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Barcode
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Price
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Stock
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                          <div className="font-medium text-sm max-w-xs">
-                            {product.name}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                          {product.brand}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
-                        {product.sku}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
-                        {product.barcode}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold">
-                        {product.price}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
-                        {product.stock}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                            <Edit className="w-4 h-4 text-gray-600" />
-                          </button>
-                          <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Brand</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">SKU</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Barcode</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {filteredProducts.length === 0 && (
-            <div className="bg-white rounded-xl p-12 border border-gray-100 shadow-sm text-center">
-              <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <h2 className="text-lg font-semibold mb-2">No products found</h2>
-              <p className="text-sm text-muted-foreground">
-                Try adjusting your search query
-              </p>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {product.image_url ? (
+                              <img src={product.image_url} alt={product.internal_name} className="w-10 h-10 rounded-lg object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                                <Package className="w-5 h-5 text-gray-400" />
+                              </div>
+                            )}
+                            <span className="font-medium text-sm max-w-xs truncate">{product.internal_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 hidden sm:table-cell">
+                          {product.brand && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${brandColor(product.brand)}`}>{product.brand}</span>}
+                        </td>
+                        <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">{product.internal_sku || '—'}</td>
+                        <td className="px-6 py-4 hidden lg:table-cell text-sm text-muted-foreground">{product.barcode || '—'}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openEdit(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Edit className="w-4 h-4 text-gray-600" /></button>
+                            <button onClick={() => handleDelete(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Trash2 className="w-4 h-4 text-red-600" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Add Product Modal */}
-      {showAddModal && (
+      {showModal && (
         <>
-          {/* Backdrop with blur */}
-          <div 
-            className="fixed inset-0 z-50 bg-white/10 backdrop-blur-sm"
-            onClick={() => setShowAddModal(false)}
-          />
-          
-          {/* Modal Panel sliding from right */}
+          <div className="fixed inset-0 z-50 bg-white/10 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl overflow-y-auto">
             <div className="p-6">
-              {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Add Product</h2>
-                <button 
-                  className="p-1.5 hover:bg-gray-100 rounded transition-colors" 
-                  onClick={() => setShowAddModal(false)}
-                >
+                <h2 className="text-xl font-semibold">{editTarget ? 'Edit Product' : 'Add Product'}</h2>
+                <button className="p-1.5 hover:bg-gray-100 rounded transition-colors" onClick={() => setShowModal(false)}>
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
               </div>
-
-              {/* Form */}
-              <form className="space-y-5">
+              <form onSubmit={handleSave} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Name
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter product name"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+                  <input type="text" value={form.internal_name} onChange={e => setForm(f => ({ ...f, internal_name: e.target.value }))} placeholder="Enter product name" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Brand
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter brand"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+                  <input type="text" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Enter brand" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SKU
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="#SKU-XXXXXXXX"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm font-mono"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
+                  <input type="text" value={form.internal_sku} onChange={e => setForm(f => ({ ...f, internal_sku: e.target.value }))} placeholder="Internal SKU" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm font-mono" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Barcode
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="#XXXXXXXX-XXX-XXX"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm font-mono"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Barcode</label>
+                  <input type="text" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} placeholder="Barcode" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm font-mono" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="AED 0.00"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                  <input type="url" value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://example.com/image.jpg" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Stock
-                  </label>
-                  <input 
-                    type="number" 
-                    placeholder="0"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Image URL
-                  </label>
-                  <input 
-                    type="url" 
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm"
-                  />
-                </div>
-
                 <div className="flex gap-3 pt-4">
-                  <button 
-                    type="button" 
-                    className="flex-1 px-4 py-2.5 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
-                    onClick={() => setShowAddModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 px-4 py-2.5 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm"
-                  >
-                    Add Product
+                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">Cancel</button>
+                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {editTarget ? 'Save Changes' : 'Add Product'}
                   </button>
                 </div>
               </form>

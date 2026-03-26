@@ -1,709 +1,312 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Compass, Sparkles, Search, ChevronDown, Check, ArrowRight, RefreshCw, ExternalLink, Play, Edit, Trash2, X, FileDown, ArrowUpDown } from 'lucide-react';
-import { useState } from 'react';
+import { Compass, Sparkles, Search, ChevronDown, Check, ArrowRight, Loader2, ExternalLink, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { companiesApi, discoveryApi } from '../../lib/monitorApi';
+import type { Company, DiscoveryMatch } from '../../lib/monitorApi';
+import { toast } from 'sonner';
 
 export function Discovering() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
-  const [companySearch, setCompanySearch] = useState('');
+  const [step, setStep] = useState(1);
+  const [query, setQuery] = useState('');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<number[]>([]);
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [productSortBy, setProductSortBy] = useState('name');
-  const [priceSortBy, setPriceSortBy] = useState('price');
-  const [priceCompanyFilter, setPriceCompanyFilter] = useState('all');
+  const [companySearch, setCompanySearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState<Array<{ company: Company; matches: DiscoveryMatch[] }>>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    companiesApi.list().then(res => setCompanies(res.data)).catch(() => {});
+  }, []);
+
+  const filteredCompanies = companies.filter(c =>
+    c.name.toLowerCase().includes(companySearch.toLowerCase())
+  );
+
+  const toggleCompany = (id: number) => {
+    setSelectedCompanyIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const removeCompany = (id: number) => {
+    setSelectedCompanyIds(prev => prev.filter(x => x !== id));
+  };
+
+  const selectedCompanies = companies.filter(c => selectedCompanyIds.includes(c.id));
+
+  const handleDiscover = async () => {
+    if (!query.trim()) { toast.error('Enter a search query'); return; }
+    if (selectedCompanyIds.length === 0) { toast.error('Select at least one company'); return; }
+    setIsSearching(true);
+    setResults([]);
+    try {
+      const allResults = await Promise.all(
+        selectedCompanyIds.map(async (companyId) => {
+          const company = companies.find(c => c.id === companyId)!;
+          try {
+            const res = await discoveryApi.search(companyId, query);
+            return { company, matches: res.data.results };
+          } catch {
+            return { company, matches: [] };
+          }
+        })
+      );
+      setResults(allResults.filter(r => r.matches.length > 0));
+      setStep(2);
+    } catch {
+      toast.error('Discovery failed');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const toggleSelect = (key: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  };
+
+  const handleConfirm = async () => {
+    const toConfirm: Array<{ companyId: number; product_id: number; url: string; image_url?: string | null }> = [];
+    results.forEach(({ company, matches }) => {
+      matches.forEach((m, i) => {
+        const key = `${company.id}-${i}`;
+        if (selected.has(key) && m.match && !m.already_tracked) {
+          toConfirm.push({ companyId: company.id, product_id: m.match.product.id, url: m.found.url, image_url: m.found.imageUrl });
+        }
+      });
+    });
+    if (toConfirm.length === 0) { toast.error('No new mappings selected'); return; }
+    setConfirming(true);
+    try {
+      const grouped = toConfirm.reduce((acc, { companyId, ...rest }) => {
+        if (!acc[companyId]) acc[companyId] = [];
+        acc[companyId].push(rest);
+        return acc;
+      }, {} as Record<number, Array<{ product_id: number; url: string; image_url?: string | null }>>);
+      let totalAdded = 0;
+      for (const [companyId, mappings] of Object.entries(grouped)) {
+        const res = await discoveryApi.confirm(Number(companyId), mappings);
+        totalAdded += res.data.added;
+      }
+      toast.success(`Added ${totalAdded} URL mappings`);
+      setStep(3);
+    } catch {
+      toast.error('Failed to save mappings');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const totalMatches = results.reduce((sum, r) => sum + r.matches.length, 0);
+  const newMatches = results.reduce((sum, r) => sum + r.matches.filter(m => !m.already_tracked).length, 0);
 
   const steps = [
     { number: 1, title: 'Discover', description: 'Search products' },
     { number: 2, title: 'Product URLs', description: 'Review mappings' },
-    { number: 3, title: 'Scrape Prices', description: 'Get latest prices' },
+    { number: 3, title: 'Done', description: 'URLs saved' },
   ];
-
-  const companies = [
-    { value: 'amazon', label: 'Amazon AE' },
-    { value: 'binsina', label: 'Bin Sina Pharmacy' },
-    { value: 'carrefour', label: 'Carrefour UAE' },
-    { value: 'chemist', label: 'Chemist Warehouse' },
-    { value: 'life', label: 'Life Pharmacy' },
-    { value: 'noon', label: 'Noon' },
-  ];
-
-  const filteredCompanies = companies.filter(company =>
-    company.label.toLowerCase().includes(companySearch.toLowerCase())
-  );
-
-  const toggleCompany = (value: string) => {
-    setSelectedCompanies(prev =>
-      prev.includes(value)
-        ? prev.filter(c => c !== value)
-        : [...prev, value]
-    );
-  };
-
-  const removeCompany = (value: string) => {
-    setSelectedCompanies(prev => prev.filter(c => c !== value));
-  };
-
-  const mockProducts = [
-    {
-      id: 1,
-      name: 'Marvis Amarelli Licorice 75 ML',
-      sku: '3187',
-      company: 'Amazon AE',
-      url: 'https://www.amazon.ae/MARV...',
-      status: 'success',
-      lastChecked: '25/03/2026 14:24',
-      active: true,
-      price: 'AED 57.00',
-      oldPrice: null,
-      discount: null,
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=100&h=100&fit=crop'
-    },
-    {
-      id: 2,
-      name: 'Marvis Amarelli Licorice 75 ML',
-      sku: '3187',
-      company: 'Bin Sina Pharmacy',
-      url: 'https://www.binsina.ae/en/buy...',
-      status: 'success',
-      lastChecked: '25/03/2026 14:20',
-      active: true,
-      price: 'AED 52.00',
-      oldPrice: 'AED 57.00',
-      discount: '-9%',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=100&h=100&fit=crop'
-    },
-    {
-      id: 3,
-      name: 'Marvis Aquatic Mint 25ML',
-      sku: '3124',
-      company: 'Bin Sina Pharmacy',
-      url: 'https://www.binsina.ae/en/buy...',
-      status: 'success',
-      lastChecked: '25/03/2026 14:20',
-      active: true,
-      price: 'AED 45.00',
-      oldPrice: null,
-      discount: null,
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=100&h=100&fit=crop'
-    },
-  ];
-
-  const mockPrices = [
-    {
-      id: 1,
-      name: 'Marvis Sensitive Gums Gentle Mint 75 ML',
-      company: 'Carrefour UAE',
-      price: 'AED 57.00',
-      oldPrice: null,
-      discount: null,
-      status: 'In Stock',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:25',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-    {
-      id: 2,
-      name: 'Marvis Whitening Mint 75 ML',
-      company: 'Amazon AE',
-      price: 'AED 57.00',
-      oldPrice: null,
-      discount: null,
-      status: 'In Stock',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:23',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-    {
-      id: 3,
-      name: 'Marvis Whitening Mint 75 ML',
-      company: 'Life Pharmacy',
-      price: 'AED 47.50',
-      oldPrice: 'AED 57.00',
-      discount: '-17%',
-      status: 'In Stock',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:26',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-    {
-      id: 4,
-      name: 'Marvis Whitening Mint 75 ML',
-      company: 'Bin Sina Pharmacy',
-      price: 'AED 57.00',
-      oldPrice: null,
-      discount: null,
-      status: 'In Stock',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:23',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-    {
-      id: 5,
-      name: 'Marvis Whitening Mint 75 ML',
-      company: 'Chemist Warehouse',
-      price: 'AED 49.99',
-      oldPrice: 'AED 57.00',
-      discount: '-12%',
-      status: 'In Stock',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:25',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-    {
-      id: 6,
-      name: 'Marvis Classic Strong Mint 75 ML',
-      company: 'Amazon AE',
-      price: 'AED 50.00',
-      oldPrice: null,
-      discount: null,
-      status: 'unknown',
-      statusType: 'success',
-      lastUpdated: '25/03/2026 14:25',
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=150&h=150&fit=crop'
-    },
-  ];
-
-  const handleDiscover = () => {
-    setIsDiscovering(true);
-    setTimeout(() => {
-      setIsDiscovering(false);
-      setCurrentStep(2);
-    }, 2000);
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
       <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20">
-        <div className="max-w-7xl mx-auto p-8">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Sparkles className="w-6 h-6" />
-                <h1 className="text-2xl font-semibold">Auto-Discover Products</h1>
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Compass className="w-6 h-6" />
+            <h1 className="text-2xl font-semibold">Discovering</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mb-8">AI-powered product URL discovery across marketplaces</p>
+
+          {/* Steps */}
+          <div className="flex items-center gap-2 mb-8 overflow-x-auto">
+            {steps.map((s, i) => (
+              <div key={s.number} className="flex items-center gap-2 shrink-0">
+                <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${step === s.number ? 'bg-black text-white' : step > s.number ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white border border-gray-200 text-muted-foreground'}`}>
+                  {step > s.number ? <Check className="w-4 h-4" /> : <span className="text-sm font-semibold">{s.number}</span>}
+                  <div>
+                    <div className="text-sm font-medium">{s.title}</div>
+                    <div className="text-xs opacity-70">{s.description}</div>
+                  </div>
+                </div>
+                {i < steps.length - 1 && <ArrowRight className="w-4 h-4 text-gray-400 shrink-0" />}
               </div>
-              <p className="text-sm text-muted-foreground">
-                AI-powered product discovery — Search one retailer or all at once
-              </p>
-            </div>
+            ))}
           </div>
 
-          {/* Step Indicator */}
-          <div className="bg-white rounded-xl p-6 mb-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between">
-              {steps.map((step, index) => (
-                <div key={step.number} className="flex items-center flex-1">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-all ${
-                        currentStep > step.number
-                          ? 'bg-green-500 text-white'
-                          : currentStep === step.number
-                          ? 'bg-black text-white'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}
-                    >
-                      {currentStep > step.number ? (
-                        <Check className="w-5 h-5" />
-                      ) : (
-                        step.number
-                      )}
+          {/* Step 1: Search */}
+          {step === 1 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
+              <h2 className="text-lg font-semibold mb-1">Search for products</h2>
+              <p className="text-sm text-muted-foreground mb-6">Enter a product name and select marketplaces to search</p>
+
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Marvis Classic Whitening Toothpaste"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleDiscover()}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 focus:bg-white text-sm transition-all"
+                  />
+                </div>
+
+                {/* Company Selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-left flex items-center justify-between bg-gray-50 hover:bg-white transition-all text-sm"
+                  >
+                    <span className={selectedCompanies.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+                      {selectedCompanies.length > 0 ? `${selectedCompanies.length} company selected` : 'Select marketplaces…'}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCompanyDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {selectedCompanies.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedCompanies.map(c => (
+                        <span key={c.id} className="flex items-center gap-1 px-2.5 py-1 bg-black text-white text-xs rounded-lg">
+                          {c.name}
+                          <button onClick={() => removeCompany(c.id)} className="ml-1 hover:text-gray-300">×</button>
+                        </span>
+                      ))}
                     </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{step.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {step.description}
+                  )}
+
+                  {showCompanyDropdown && (
+                    <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                      <div className="p-2 border-b border-gray-100">
+                        <input
+                          type="text"
+                          placeholder="Search companies…"
+                          value={companySearch}
+                          onChange={e => setCompanySearch(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {filteredCompanies.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => { toggleCompany(c.id); setCompanySearch(''); }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-sm"
+                          >
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${selectedCompanyIds.includes(c.id) ? 'bg-black border-black' : 'border-gray-300'}`}>
+                              {selectedCompanyIds.includes(c.id) && <Check className="w-3 h-3 text-white" />}
+                            </div>
+                            {c.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <ArrowRight className="w-5 h-5 text-gray-300 mx-4" />
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Step Content */}
-          {currentStep === 1 && (
-            <div className="bg-white rounded-xl p-8 border border-gray-100 shadow-sm">
-              <div className="max-w-2xl mx-auto">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-[#CBAE64] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-white" />
-                  </div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    Discover Products with AI
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Claude AI matches found products to your catalog
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Search Query */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Search Query{' '}
-                      <span className="text-muted-foreground font-normal">
-                        (any brand or product name)
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. marvis, dove, colgate..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
-                    />
-                  </div>
-
-                  {/* Company Selector */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Company{' '}
-                      <span className="text-muted-foreground font-normal">
-                        (leave blank to search all)
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <div
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-black/5 transition-all cursor-pointer"
-                        onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-                      >
-                        {selectedCompanies.length > 0
-                          ? selectedCompanies.map(company =>
-                              companies.find(c => c.value === company)?.label
-                            ).join(', ')
-                          : 'All Companies'}
-                      </div>
-                      <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      {showCompanyDropdown && (
-                        <div className="absolute z-10 w-full bg-white rounded-lg shadow-lg mt-1">
-                          <input
-                            type="text"
-                            placeholder="Search companies..."
-                            value={companySearch}
-                            onChange={(e) => setCompanySearch(e.target.value)}
-                            className="w-full px-4 py-2 border-b border-gray-200 rounded-t-lg focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
-                          />
-                          <div className="max-h-40 overflow-y-auto">
-                            {filteredCompanies.map(company => (
-                              <div
-                                key={company.value}
-                                className="px-4 py-2 cursor-pointer hover:bg-gray-50/50 transition-colors"
-                                onClick={() => toggleCompany(company.value)}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedCompanies.includes(company.value)}
-                                    onChange={() => toggleCompany(company.value)}
-                                    className="rounded"
-                                  />
-                                  <span>{company.label}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-4 pt-4">
-                    <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSelectedCompanies([]);
-                      }}
-                      className="px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleDiscover}
-                      disabled={isDiscovering || !searchQuery}
-                      className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isDiscovering ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span className="text-sm font-medium">Discovering...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            {selectedCompanies.length > 0 ? 'Discover Selected Companies' : 'Discover All Companies'}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={handleDiscover}
+                  disabled={isSearching || !query.trim() || selectedCompanyIds.length === 0}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                >
+                  {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {isSearching ? 'Discovering…' : 'Discover Products'}
+                </button>
               </div>
             </div>
           )}
 
-          {currentStep === 2 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-              {/* Table Header */}
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          {/* Step 2: Review */}
+          {step === 2 && (
+            <div>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold">Product URLs</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {mockProducts.length} URL mappings being monitored
-                  </p>
+                  <h2 className="text-lg font-semibold">Review discovered URLs</h2>
+                  <p className="text-sm text-muted-foreground">{totalMatches} found · {newMatches} new · select to save</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50 rounded-lg transition-colors">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setStep(1)} className="px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">← Back</button>
                   <button
-                    onClick={() => setCurrentStep(3)}
-                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm text-sm font-medium"
+                    onClick={handleConfirm}
+                    disabled={confirming || selected.size === 0}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
                   >
-                    <Play className="w-4 h-4" />
-                    Scrape All
+                    {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    Save Selected ({selected.size})
                   </button>
                 </div>
               </div>
 
-              {/* Company Filter */}
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative w-64">
-                    <select
-                      value={companyFilter}
-                      onChange={(e) => setCompanyFilter(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-black/5 transition-all cursor-pointer text-sm"
-                    >
-                      <option value="all">All Companies</option>
-                      {companies.map(company => (
-                        <option key={company.value} value={company.value}>
-                          {company.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {results.map(({ company, matches }) => (
+                <div key={company.id} className="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+                  <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                    <span className="font-semibold text-sm">{company.name}</span>
+                    <span className="text-xs text-muted-foreground">{matches.length} results</span>
                   </div>
-                  <div className="relative w-48">
-                    <select
-                      value={productSortBy}
-                      onChange={(e) => setProductSortBy(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-black/5 transition-all cursor-pointer text-sm"
-                    >
-                      <option value="name">Sort by Name</option>
-                      <option value="company">Sort by Company</option>
-                      <option value="price">Sort by Price</option>
-                      <option value="date">Sort by Date</option>
-                    </select>
-                    <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                {selectedProducts.length > 0 && (
-                  <button
-                    onClick={() => setCurrentStep(3)}
-                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm text-sm font-medium"
-                  >
-                    <Play className="w-4 h-4" />
-                    Scrape Selected ({selectedProducts.length})
-                  </button>
-                )}
-              </div>
-
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50/50">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        <input type="checkbox" className="rounded" />
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Product
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Company
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Price
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        URL
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Last Status
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Last Checked
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Active
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {mockProducts
-                      .filter(product => companyFilter === 'all' || product.company === companyFilter)
-                      .map((product) => (
-                        <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-6 py-4">
+                  <div className="divide-y divide-gray-50">
+                    {matches.map((m, i) => {
+                      const key = `${company.id}-${i}`;
+                      const isTracked = m.already_tracked;
+                      return (
+                        <div key={key} className={`px-5 py-3 flex items-start gap-3 ${isTracked ? 'opacity-50' : ''}`}>
+                          {!isTracked && (
                             <input
                               type="checkbox"
-                              className="rounded"
-                              checked={selectedProducts.includes(product.id)}
-                              onChange={() => {
-                                if (selectedProducts.includes(product.id)) {
-                                  setSelectedProducts(prev => prev.filter(id => id !== product.id));
-                                } else {
-                                  setSelectedProducts(prev => [...prev, product.id]);
-                                }
-                              }}
+                              checked={selected.has(key)}
+                              onChange={() => toggleSelect(key)}
+                              className="mt-1 rounded shrink-0"
                             />
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="w-10 h-10 rounded-lg object-cover"
-                              />
-                              <div>
-                                <div className="text-sm font-medium">{product.name}</div>
-                                <div className="text-xs text-muted-foreground">{product.sku}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-muted-foreground">
-                            {product.company}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-green-600">
-                                {product.price}
-                              </span>
-                              {product.oldPrice && (
-                                <>
-                                  <span className="text-xs text-muted-foreground line-through">
-                                    {product.oldPrice}
-                                  </span>
-                                  <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                                    {product.discount}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <a
-                              href="#"
-                              className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              {product.url}
-                              <ExternalLink className="w-3 h-3" />
+                          )}
+                          {isTracked && <div className="w-4 shrink-0 mt-1"><Check className="w-4 h-4 text-green-500" /></div>}
+                          {m.found.imageUrl && (
+                            <img src={m.found.imageUrl} alt={m.found.name} className="w-12 h-12 object-cover rounded-lg shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{m.found.name}</p>
+                            {m.match && (
+                              <p className="text-xs text-muted-foreground">Matched: {m.match.product.internal_name} ({Math.round(m.match.confidence * 100)}%)</p>
+                            )}
+                            <a href={m.found.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-0.5">
+                              View product <ExternalLink className="w-3 h-3" />
                             </a>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700">
-                              {product.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-muted-foreground">
-                            {product.lastChecked}
-                          </td>
-                          <td className="px-6 py-4">
-                            {product.active && <Check className="w-4 h-4 text-green-600" />}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                                <Play className="w-4 h-4 text-gray-600" />
-                              </button>
-                              <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                                <Edit className="w-4 h-4 text-gray-600" />
-                              </button>
-                              <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                          {isTracked && <span className="text-xs text-green-600 shrink-0">Already tracked</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {results.length === 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+                  <p className="text-sm text-muted-foreground">No results found for your query</p>
+                  <button onClick={() => setStep(1)} className="mt-4 px-4 py-2 text-sm bg-black text-white rounded-lg">Try again</button>
+                </div>
+              )}
             </div>
           )}
 
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              {/* Header */}
-              <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">Scraped Prices</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Latest prices from all monitored retailers
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <select
-                      value={priceCompanyFilter}
-                      onChange={(e) => setPriceCompanyFilter(e.target.value)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-black/5 transition-all cursor-pointer text-sm pr-10"
-                    >
-                      <option value="all">All Companies</option>
-                      {companies.map(company => (
-                        <option key={company.value} value={company.value}>
-                          {company.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                  <div className="relative">
-                    <select
-                      value={priceSortBy}
-                      onChange={(e) => setPriceSortBy(e.target.value)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-black/5 transition-all cursor-pointer text-sm pr-10"
-                    >
-                      <option value="price">Sort by Price</option>
-                      <option value="name">Sort by Name</option>
-                      <option value="company">Sort by Company</option>
-                    </select>
-                    <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm text-sm font-medium">
-                    <FileDown className="w-4 h-4" />
-                    Export PDF
-                  </button>
-                </div>
+          {/* Step 3: Done */}
+          {step === 3 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-500" />
               </div>
-
-              {/* Price Table */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50/50">
-                      <tr>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Product
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Company
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Current Price
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Old Price
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Discount
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Status
-                        </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">
-                          Last Updated
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {mockPrices
-                        .filter(price => priceCompanyFilter === 'all' || price.company === priceCompanyFilter)
-                        .sort((a, b) => {
-                          if (priceSortBy === 'price') {
-                            return parseFloat(a.price.replace(/[^0-9.]/g, '')) - parseFloat(b.price.replace(/[^0-9.]/g, ''));
-                          } else if (priceSortBy === 'company') {
-                            return a.company.localeCompare(b.company);
-                          } else {
-                            return a.name.localeCompare(b.name);
-                          }
-                        })
-                        .map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                                <div>
-                                  <div className="text-sm font-medium">{item.name}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-muted-foreground">
-                              {item.company}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm font-semibold text-green-600">
-                                {item.price}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              {item.oldPrice ? (
-                                <span className="text-sm text-muted-foreground line-through">
-                                  {item.oldPrice}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              {item.discount ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700">
-                                  {item.discount}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                                  item.status === 'In Stock'
-                                    ? 'bg-green-50 text-green-700'
-                                    : 'bg-gray-100 text-gray-600'
-                                }`}
-                              >
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-muted-foreground">
-                              {item.lastUpdated}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-center gap-4">
-                <button
-                  onClick={() => setCurrentStep(1)}
-                  className="px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  New Discovery
-                </button>
-                <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm text-sm font-medium">
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh All Prices
+              <h2 className="text-xl font-semibold mb-2">URLs saved successfully!</h2>
+              <p className="text-sm text-muted-foreground mb-6">The discovered product URLs have been added to your monitoring list.</p>
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={() => { setStep(1); setQuery(''); setSelectedCompanyIds([]); setResults([]); setSelected(new Set()); }} className="px-5 py-2.5 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg">
+                  Discover More
                 </button>
               </div>
             </div>
