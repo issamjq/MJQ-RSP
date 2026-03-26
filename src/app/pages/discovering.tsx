@@ -152,6 +152,49 @@ function PriceBadge({ price, loading }: { price?: number | null; loading: boolea
   );
 }
 
+// ── Discovery Steps ───────────────────────────────────────────────
+const STEPS = [
+  { label: 'Discover', desc: 'Search & AI match' },
+  { label: 'Review', desc: 'Select products' },
+  { label: 'Track', desc: 'Save & get prices' },
+];
+
+function phaseToStep(phase: 'search' | 'processing' | 'review' | 'results'): number {
+  if (phase === 'search' || phase === 'processing') return 0;
+  if (phase === 'review') return 1;
+  return 2;
+}
+
+function DiscoverySteps({ phase }: { phase: 'search' | 'processing' | 'review' | 'results' }) {
+  const active = phaseToStep(phase);
+  return (
+    <div className="flex items-center gap-0 mb-6">
+      {STEPS.map((step, i) => (
+        <div key={step.label} className="flex items-center flex-1 last:flex-none">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all ${
+              i < active
+                ? 'bg-black border-black text-white'
+                : i === active
+                  ? 'bg-black border-black text-white ring-4 ring-black/10'
+                  : 'bg-white border-gray-200 text-gray-400'
+            }`}>
+              {i < active ? <Check className="w-3.5 h-3.5" /> : i + 1}
+            </div>
+            <div className="hidden sm:block">
+              <p className={`text-xs font-semibold leading-tight ${i <= active ? 'text-foreground' : 'text-gray-400'}`}>{step.label}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">{step.desc}</p>
+            </div>
+          </div>
+          {i < STEPS.length - 1 && (
+            <div className={`flex-1 h-px mx-3 transition-all ${i < active ? 'bg-black' : 'bg-gray-200'}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────
 type Phase = 'search' | 'processing' | 'review' | 'results';
 
@@ -450,6 +493,9 @@ export function Discovering() {
             AI-powered product discovery — finds, matches, saves, and prices everything in one click
           </p>
 
+          {/* Steps */}
+          <DiscoverySteps phase={phase} />
+
           {/* Search card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 mb-5">
             {phase !== 'search' ? (
@@ -687,18 +733,12 @@ export function Discovering() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold mb-0.5 leading-snug">{cleanName(m.found.name)}</p>
-                        {m.match ? (
+                        {m.match && !isSizeMismatch ? (
                           <p className="text-xs text-muted-foreground mb-1">
-                            Matched: <span className={isSizeMismatch ? 'text-red-600 line-through' : 'text-foreground'}>{m.match.product.internal_name}</span>
-                            {isSizeMismatch ? (
-                              <span className="ml-1.5 px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-medium">
-                                ⚠ size mismatch — skipped
-                              </span>
-                            ) : (
-                              <span className="ml-1.5 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">
-                                {Math.round(m.match.confidence * 100)}% match
-                              </span>
-                            )}
+                            Matched: <span className="text-foreground">{m.match.product.internal_name}</span>
+                            <span className="ml-1.5 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">
+                              {Math.round(m.match.confidence * 100)}% match
+                            </span>
                           </p>
                         ) : (
                           <p className="text-xs text-amber-600 mb-1">No match in catalog</p>
