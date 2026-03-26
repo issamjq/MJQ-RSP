@@ -50,9 +50,13 @@ function cleanName(raw: string): string {
   return result.replace(/\s{2,}/g, ' ').trim();
 }
 
-function formatDone(ms: number) {
+function formatDone(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s} sec`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m} min ${rem} sec` : `${m} min`;
 }
 
 // ── AI Thinking Log ───────────────────────────────────────────────
