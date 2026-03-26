@@ -1,18 +1,8 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Compass, Sparkles, Search, ChevronDown, Check, Loader2, ExternalLink, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { companiesApi, discoveryApi } from '../../lib/monitorApi';
-import type { Company, DiscoveryMatch, PriceSnapshot } from '../../lib/monitorApi';
-import { toast } from 'sonner';
-
-interface LogStep {
-  id: string;
-  text: string;
-  status: 'pending' | 'running' | 'done' | 'error';
-  detail?: string;
-  startedAt?: number;
-  endedAt?: number;
-}
+import { useEffect, useRef, useState } from 'react';
+import { useDiscovery, sizeMismatch } from '../contexts/discovery-context';
+import type { LogStep, Phase } from '../contexts/discovery-context';
 
 // Strip junk appended to scraped product names (delivery info, stock status, prices, ratings, etc.)
 function cleanName(raw: string): string {
@@ -58,20 +48,6 @@ function cleanName(raw: string): string {
     result = result.replace(p, '');
   }
   return result.replace(/\s{2,}/g, ' ').trim();
-}
-
-// Extract size/volume from a product name e.g. "75ml", "85g", "1L"
-function extractSize(name: string): string | null {
-  const m = name.match(/\b(\d+(?:\.\d+)?)\s*(ml|g|mg|kg|oz|l)\b/i);
-  return m ? `${m[1]}${m[2].toLowerCase()}` : null;
-}
-
-// Returns true when found name and internal name have different measurable sizes
-function sizeMismatch(foundName: string, internalName: string): boolean {
-  const a = extractSize(foundName);
-  const b = extractSize(internalName);
-  if (!a || !b) return false;
-  return a !== b;
 }
 
 function formatDone(ms: number) {
@@ -159,13 +135,13 @@ const STEPS = [
   { label: 'Track', desc: 'Save & get prices' },
 ];
 
-function phaseToStep(phase: 'search' | 'processing' | 'review' | 'results'): number {
+function phaseToStep(phase: Phase): number {
   if (phase === 'search' || phase === 'processing') return 0;
   if (phase === 'review') return 1;
   return 2;
 }
 
-function DiscoverySteps({ phase }: { phase: 'search' | 'processing' | 'review' | 'results' }) {
+function DiscoverySteps({ phase }: { phase: Phase }) {
   const active = phaseToStep(phase);
   return (
     <div className="flex items-center gap-0 mb-6">
@@ -196,37 +172,17 @@ function DiscoverySteps({ phase }: { phase: 'search' | 'processing' | 'review' |
 }
 
 // ── Main Page ─────────────────────────────────────────────────────
-type Phase = 'search' | 'processing' | 'review' | 'results';
-
-interface DiscoveryGroup {
-  company: Company;
-  matches: DiscoveryMatch[];
-}
-
 export function Discovering() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [phase, setPhase] = useState<Phase>('search');
+  const {
+    companies, phase, query, setQuery, selectedIds,
+    logSteps, discoverStartedAt, results, prices, selected,
+    toggle, toggleSelect, setSelectedKeys, handleDiscover, handleSaveSelected, handleNewSearch,
+  } = useDiscovery();
 
-  // Search form
-  const [query, setQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Local UI state only
   const [showDropdown, setShowDropdown] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Processing
-  const [logSteps, setLogSteps] = useState<LogStep[]>([]);
-  const [discoverStartedAt, setDiscoverStartedAt] = useState<number>(0);
-
-  // Results
-  const [results, setResults] = useState<DiscoveryGroup[]>([]);
-  const [prices, setPrices] = useState<Record<string, PriceSnapshot | null | 'loading'>>({});
-  // Review selection: "companyId-matchIndex"
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    companiesApi.list().then(r => setCompanies(r.data)).catch(() => {});
-  }, []);
 
   // Click-outside to close company dropdown
   useEffect(() => {
@@ -244,239 +200,6 @@ export function Discovering() {
     c.name.toLowerCase().includes(companySearch.toLowerCase())
   );
   const selectedCompanies = companies.filter(c => selectedIds.includes(c.id));
-  const toggle = (id: number) =>
-    setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
-
-  // Log helpers
-  const addLog = useCallback((id: string, text: string, status: LogStep['status'], detail?: string) => {
-    const now = Date.now();
-    setLogSteps(prev => {
-      if (prev.find(s => s.id === id)) {
-        return prev.map(s => s.id === id ? {
-          ...s, text, status, detail,
-          ...(status === 'running' && !s.startedAt ? { startedAt: now } : {}),
-          ...(status === 'done' || status === 'error' ? { endedAt: now } : {}),
-        } : s);
-      }
-      return [...prev, {
-        id, text, status, detail,
-        startedAt: status === 'running' ? now : undefined,
-        endedAt: (status === 'done' || status === 'error') ? now : undefined,
-      }];
-    });
-  }, []);
-
-  const updateLog = useCallback((id: string, status: LogStep['status'], text?: string, detail?: string) => {
-    const now = Date.now();
-    setLogSteps(prev => prev.map(s =>
-      s.id === id ? {
-        ...s, status,
-        ...(text !== undefined ? { text } : {}),
-        ...(detail !== undefined ? { detail } : {}),
-        ...(status === 'running' && !s.startedAt ? { startedAt: now } : {}),
-        ...(status === 'done' || status === 'error' ? { endedAt: now } : {}),
-      } : s
-    ));
-  }, []);
-
-  const handleDiscover = async () => {
-    if (!query.trim()) { toast.error('Enter a product name'); return; }
-    if (selectedIds.length === 0) { toast.error('Select at least one marketplace'); return; }
-
-    setPhase('processing');
-    setLogSteps([]);
-    setResults([]);
-    setPrices({});
-    setDiscoverStartedAt(Date.now());
-
-    const targetCompanies = companies.filter(c => selectedIds.includes(c.id));
-
-    // ── Step 1: Search ──────────────────────────────────────────
-    addLog('init', `Starting discovery for "${query}"`, 'running');
-
-    targetCompanies.forEach(c => {
-      addLog(`scan-${c.id}`, `Scanning ${c.name}…`, 'running');
-    });
-
-    const allGroups: DiscoveryGroup[] = [];
-
-    await Promise.all(
-      targetCompanies.map(async company => {
-        const t1 = setTimeout(() =>
-          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ still working…'),
-          30000
-        );
-        const t2 = setTimeout(() =>
-          updateLog(`scan-${company.id}`, 'running', `Scanning ${company.name}…`, '⏳ taking longer than usual, be patient…'),
-          60000
-        );
-        try {
-          const res = await discoveryApi.search(company.id, query);
-          clearTimeout(t1); clearTimeout(t2);
-          const matches = res.data.results;
-          allGroups.push({ company, matches });
-          updateLog(`scan-${company.id}`, 'done',
-            `Scanned ${company.name}`,
-            `→ ${matches.length} product${matches.length !== 1 ? 's' : ''} found`
-          );
-        } catch {
-          clearTimeout(t1); clearTimeout(t2);
-          updateLog(`scan-${company.id}`, 'error', `Scanned ${company.name}`, '→ failed');
-        }
-      })
-    );
-
-    const validGroups = allGroups
-      .filter(g => g.matches.length > 0)
-      .sort((a, b) => b.matches.length - a.matches.length);
-
-    const totalFound = validGroups.reduce((s, g) => s + g.matches.length, 0);
-    updateLog('init', 'done', 'Search complete', `${totalFound} products found across ${validGroups.length} marketplace${validGroups.length !== 1 ? 's' : ''}`);
-
-    if (validGroups.length === 0) {
-      addLog('done', 'No products found. Try a different query.', 'error');
-      setPhase('search');
-      toast.info('No products found.');
-      return;
-    }
-
-    // ── Step 2: AI Matching (done server-side, brief visual pause) ──
-    addLog('match', 'AI matching products to your catalog…', 'running');
-    await new Promise(r => setTimeout(r, 500));
-
-    const newCount = validGroups.reduce(
-      (s, g) => s + g.matches.filter(m => !m.already_tracked && m.match && !sizeMismatch(m.found.name, m.match.product.internal_name)).length, 0
-    );
-    const skippedCount = validGroups.reduce(
-      (s, g) => s + g.matches.filter(m => !m.already_tracked && m.match && sizeMismatch(m.found.name, m.match.product.internal_name)).length, 0
-    );
-    const trackedCount = validGroups.reduce(
-      (s, g) => s + g.matches.filter(m => m.already_tracked).length, 0
-    );
-    updateLog('match', 'done', 'AI matching complete',
-      `${newCount} new · ${trackedCount} tracked${skippedCount > 0 ? ` · ${skippedCount} size mismatch skipped` : ''}`
-    );
-
-    if (newCount === 0) {
-      addLog('alldone', 'All found products are already tracked!', 'done');
-      setResults(validGroups);
-      setPhase('results');
-      return;
-    }
-
-    // ── Step 3: Transition to review — let user pick what to add ─
-    addLog('review', `Ready to review — ${newCount} new product${newCount !== 1 ? 's' : ''} to add`, 'done');
-
-    // Pre-select valid matches (no size mismatch, not already tracked)
-    const autoSelected = new Set<string>();
-    validGroups.forEach(({ company, matches }) => {
-      matches.forEach((m, i) => {
-        if (!m.already_tracked && m.match && !sizeMismatch(m.found.name, m.match.product.internal_name)) {
-          autoSelected.add(`${company.id}-${i}`);
-        }
-      });
-    });
-
-    setSelected(autoSelected);
-    setResults(validGroups);
-    setPhase('review');
-  };
-
-  const handleSaveSelected = async () => {
-    const toSave: Array<{
-      companyId: number;
-      product_id: number;
-      url: string;
-      image_url?: string | null;
-      price?: number | null;
-      original_price?: number | null;
-      currency?: string;
-      availability?: string;
-      key: string;
-    }> = [];
-
-    results.forEach(({ company, matches }) => {
-      matches.forEach((m, i) => {
-        const key = `${company.id}-${i}`;
-        if (selected.has(key) && m.match && !m.already_tracked) {
-          toSave.push({
-            companyId: company.id,
-            product_id: m.match.product.id,
-            url: m.found.url,
-            image_url: m.found.imageUrl,
-            price: m.found.price,
-            original_price: m.found.original_price,
-            currency: m.found.currency,
-            availability: m.found.availability,
-            key,
-          });
-        }
-      });
-    });
-
-    if (toSave.length === 0) { toast.error('Select at least one product'); return; }
-
-    setPhase('results');
-    addLog('save', `Saving ${toSave.length} URL${toSave.length !== 1 ? 's' : ''} to monitoring…`, 'running');
-
-    const grouped = toSave.reduce((acc, { companyId, product_id, url, image_url, price, original_price, currency, availability }) => {
-      if (!acc[companyId]) acc[companyId] = [];
-      acc[companyId].push({ product_id, url, image_url, price, original_price, currency, availability });
-      return acc;
-    }, {} as Record<number, Array<{ product_id: number; url: string; image_url?: string | null; price?: number | null; original_price?: number | null; currency?: string; availability?: string }>>);
-
-    let savedCount = 0;
-    try {
-      for (const [cId, mappings] of Object.entries(grouped)) {
-        const res = await discoveryApi.confirm(Number(cId), mappings);
-        savedCount += res.data.added;
-      }
-      updateLog('save', 'done', `Saved ${savedCount} URL${savedCount !== 1 ? 's' : ''}`, '');
-    } catch {
-      updateLog('save', 'error', 'Failed to save URLs', '');
-      return;
-    }
-
-    // Prices already came from discovery — populate directly, no scrape needed
-    const priceMap: Record<string, PriceSnapshot | null> = {};
-    toSave.forEach(x => {
-      priceMap[x.key] = x.price != null ? {
-        id: 0,
-        product_id: x.product_id,
-        company_id: x.companyId,
-        product_company_url_id: null,
-        title_found: null,
-        price: x.price,
-        original_price: x.original_price ?? null,
-        currency: x.currency ?? 'AED',
-        availability: x.availability ?? 'unknown',
-        raw_price_text: null,
-        raw_availability_text: null,
-        scrape_status: 'success',
-        error_message: null,
-        checked_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        internal_name: '',
-        company_name: '',
-        image_url: x.image_url ?? null,
-        product_url: x.url,
-      } : null;
-    });
-    setPrices(priceMap);
-
-    addLog('alldone', `Done! ${savedCount} product${savedCount !== 1 ? 's' : ''} added to monitoring.`, 'done');
-  };
-
-  const handleNewSearch = () => {
-    setPhase('search');
-    setResults([]);
-    setPrices({});
-    setLogSteps([]);
-    setSelected(new Set());
-  };
-
-  const toggleSelect = (key: string) =>
-    setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -659,12 +382,11 @@ export function Discovering() {
                 {phase === 'review' && selectableKeys.length > 0 && (
                   <button
                     onClick={() => {
-                      setSelected(prev => {
-                        const n = new Set(prev);
-                        if (allChecked) selectableKeys.forEach(k => n.delete(k));
-                        else selectableKeys.forEach(k => n.add(k));
-                        return n;
-                      });
+                      if (allChecked) {
+                        setSelectedKeys([...selected].filter(k => !selectableKeys.includes(k)));
+                      } else {
+                        setSelectedKeys([...new Set([...selected, ...selectableKeys])]);
+                      }
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -694,7 +416,7 @@ export function Discovering() {
                         isTracked ? 'opacity-55' : isSizeMismatch ? 'bg-red-50/40' : ''
                       }`}
                     >
-                      {/* Image — shown once price or discovery image is available */}
+                      {/* Image */}
                       {resolvedImage ? (
                         <img
                           src={resolvedImage}

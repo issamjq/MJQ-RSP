@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/sonner';
 import { auth } from '../lib/firebase';
 import type { User } from 'firebase/auth';
 import { Login } from './pages/login';
+import { DiscoveryProvider } from './contexts/discovery-context';
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -37,9 +38,9 @@ export default function App() {
   }
 
   return (
-    <>
+    <DiscoveryProvider>
       <RouterProvider router={router} />
       <Toaster />
-    </>
+    </DiscoveryProvider>
   );
 }
