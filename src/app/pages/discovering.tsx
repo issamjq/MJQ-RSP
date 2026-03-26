@@ -1,6 +1,6 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Compass, Sparkles, Search, ChevronDown, Check, ArrowRight, Loader2, ExternalLink, Plus } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { companiesApi, discoveryApi } from '../../lib/monitorApi';
 import type { Company, DiscoveryMatch } from '../../lib/monitorApi';
 import { toast } from 'sonner';
@@ -16,10 +16,23 @@ export function Discovering() {
   const [results, setResults] = useState<Array<{ company: Company; matches: DiscoveryMatch[] }>>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     companiesApi.list().then(res => setCompanies(res.data)).catch(() => {});
   }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showCompanyDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowCompanyDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showCompanyDropdown]);
 
   const filteredCompanies = companies.filter(c =>
     c.name.toLowerCase().includes(companySearch.toLowerCase())
@@ -115,7 +128,7 @@ export function Discovering() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
-      <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20">
+      <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20 pt-14 md:pt-0">
         <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
           <div className="flex items-center gap-3 mb-2">
             <Compass className="w-6 h-6" />
@@ -159,7 +172,7 @@ export function Discovering() {
                 </div>
 
                 {/* Company Selector */}
-                <div className="relative">
+                <div className="relative" ref={dropdownRef}>
                   <button
                     type="button"
                     onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
