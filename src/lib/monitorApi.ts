@@ -168,7 +168,15 @@ export const scraperApi = {
 };
 
 export interface DiscoveryMatch {
-  found: { name: string; url: string; imageUrl?: string | null };
+  found: {
+    name: string;
+    url: string;
+    imageUrl?: string | null;
+    price?: number | null;
+    original_price?: number | null;
+    currency?: string;
+    availability?: string;
+  };
   match: { product: Product; confidence: number } | null;
   method: "ai" | "fuzzy";
   already_tracked: boolean;
@@ -184,7 +192,7 @@ export interface DiscoveryResult {
 export const discoveryApi = {
   search: (companyId: number, query: string) =>
     api.post<ApiResponse<DiscoveryResult>>("/api/discovery/search", { company_id: companyId, query }),
-  confirm: (companyId: number, mappings: Array<{ product_id: number; url: string; image_url?: string | null }>) =>
+  confirm: (companyId: number, mappings: Array<{ product_id: number; url: string; image_url?: string | null; price?: number | null; original_price?: number | null; currency?: string; availability?: string }>) =>
     api.post<ApiResponse<{ added: number }>>("/api/discovery/confirm", { company_id: companyId, mappings }),
 };
 

@@ -1,7 +1,7 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Compass, Sparkles, Search, ChevronDown, Check, Loader2, ExternalLink, DollarSign, Package, CheckCircle2, XCircle, Circle } from 'lucide-react';
+import { Compass, Sparkles, Search, ChevronDown, Check, Loader2, ExternalLink, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { companiesApi, discoveryApi, urlsApi, scraperApi, snapshotsApi, syncRunsApi } from '../../lib/monitorApi';
+import { companiesApi, discoveryApi } from '../../lib/monitorApi';
 import type { Company, DiscoveryMatch, PriceSnapshot } from '../../lib/monitorApi';
 import { toast } from 'sonner';
 
@@ -14,24 +14,64 @@ interface LogStep {
   endedAt?: number;
 }
 
-// Rough estimate of how long each step takes (ms) — used for ETA
-const STEP_ESTIMATES: Record<string, number> = {
-  init: 500,
-  match: 600,
-  save: 1500,
-  price: 30000,  // scraping is the longest
-  default: 5000, // per marketplace scan
-};
+// Strip junk appended to scraped product names (delivery info, stock status, prices, ratings, etc.)
+function cleanName(raw: string): string {
+  const noisePatterns: RegExp[] = [
+    // Delivery / shipping
+    /\s*Next[-\s]?Day\s+Delivery\b.*/i,
+    /\s*Same[-\s]?Day\s+Delivery\b.*/i,
+    /\s*(Express|Standard|Free|Fast)\s+Delivery\b.*/i,
+    /\s*Delivery\s*[:\-–].*/i,
+    /\s*Order\s+by\b.*/i,
+    /\s*Ships?\s+(from|to|within|by|in)\b.*/i,
+    /\s*Dispatched\s+(within|in|by)\b.*/i,
+    // Stock status
+    /\s*Out\s+of\s+Stock\b.*/i,
+    /\s*In\s+Stock\b.*/i,
+    /\s*Limited\s+Stock\b.*/i,
+    /\s*Available\s*(for|to|in|now)\b.*/i,
+    // Ratings / reviews
+    /\s*Rating\s*[:\-–\(].*/i,
+    /\s*\(\s*\d+\s*(Reviews?|Ratings?|Stars?)\s*\).*/i,
+    /\s*\d+\s*(Reviews?|Ratings?|Stars?)\b.*/i,
+    // Loyalty / rewards
+    /\s*Earn\s+up\s+to\b.*/i,
+    /\s*Earn\s+\d+\b.*/i,
+    /\s*Care\s+Reward\b.*/i,
+    /\s*Reward\s+Points?\b.*/i,
+    // Prices
+    /\s*AED\s*[\d,.]+.*/i,
+    /\s*[\$£€]\s*[\d,.]+.*/,
+    /\s+\d{1,5}\.\d{2}\b.*/,
+    // Promotions / badges
+    /\s*[\|\•·–—]\s*.*/,
+    /\s*(New|Sale|Hot|Best\s+Seller|Bestseller|Clearance)\b.*/i,
+    /\s*\d{1,3}%\s*(Off|Discount|Sale)\b.*/i,
+    /\s*Add\s+to\s+(Cart|Bag|Basket|Wishlist)\b.*/i,
+    /\s*Buy\s+(Now|Online|Today)\b.*/i,
+    // Generic trailing noise starting with unwanted verbs/phrases
+    /\s*(Get|Shop|Save|View|Click|Subscribe)\s+.*/i,
+  ];
 
-function stepEstimate(id: string) {
-  if (id.startsWith('scan-')) return STEP_ESTIMATES.default;
-  return STEP_ESTIMATES[id] ?? STEP_ESTIMATES.default;
+  let result = raw;
+  for (const p of noisePatterns) {
+    result = result.replace(p, '');
+  }
+  return result.replace(/\s{2,}/g, ' ').trim();
 }
 
-function formatEta(ms: number) {
-  if (ms <= 0) return 'almost done';
-  if (ms < 5000) return `~${Math.ceil(ms / 1000)}s`;
-  return `~${Math.ceil(ms / 1000)}s`;
+// Extract size/volume from a product name e.g. "75ml", "85g", "1L"
+function extractSize(name: string): string | null {
+  const m = name.match(/\b(\d+(?:\.\d+)?)\s*(ml|g|mg|kg|oz|l)\b/i);
+  return m ? `${m[1]}${m[2].toLowerCase()}` : null;
+}
+
+// Returns true when found name and internal name have different measurable sizes
+function sizeMismatch(foundName: string, internalName: string): boolean {
+  const a = extractSize(foundName);
+  const b = extractSize(internalName);
+  if (!a || !b) return false;
+  return a !== b;
 }
 
 function formatDone(ms: number) {
@@ -41,103 +81,56 @@ function formatDone(ms: number) {
 
 // ── AI Thinking Log ───────────────────────────────────────────────
 function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number }) {
-  const [now, setNow] = useState(Date.now());
-  const bottomRef = useRef<HTMLDivElement>(null);
   const isDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
-
-  useEffect(() => {
-    if (isDone) return;
-    const t = setInterval(() => setNow(Date.now()), 300);
-    return () => clearInterval(t);
-  }, [isDone]);
-
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [steps]);
-
-  // Compute ETA: sum of estimates for pending + remaining time on running steps
-  const eta = (() => {
-    if (isDone) return 0;
-    let remaining = 0;
-    steps.forEach(s => {
-      const est = stepEstimate(s.id);
-      if (s.status === 'pending') {
-        remaining += est;
-      } else if (s.status === 'running' && s.startedAt) {
-        const elapsed = now - s.startedAt;
-        remaining += Math.max(0, est - elapsed);
-      }
-    });
-    return remaining;
-  })();
 
   const totalTook = isDone && steps.some(s => s.endedAt)
     ? Math.max(...steps.filter(s => s.endedAt).map(s => s.endedAt!)) - startedAt
     : null;
 
   return (
-    <div className="bg-gray-950 rounded-2xl p-5 font-mono text-sm">
-      <div className="text-gray-500 text-xs mb-4 flex items-center justify-between">
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 font-mono text-sm shadow-sm">
+      <div className="text-gray-400 text-xs mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-3 h-3 text-amber-400" />
-          <span className="text-amber-400 font-semibold">AI Discovery Agent</span>
-          {!isDone && <span className="text-gray-500">— running</span>}
-          {isDone && <span className="text-green-500">— complete</span>}
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          <span className="text-amber-600 font-semibold">AI Discovery Agent</span>
+          {!isDone && <span className="text-gray-400">— running</span>}
+          {isDone && <span className="text-green-600">— complete</span>}
         </div>
-        {isDone && totalTook !== null ? (
-          <span className="text-green-500 tabular-nums">finished in {formatDone(totalTook)}</span>
-        ) : (
-          <span className="text-amber-500 tabular-nums">est. {formatEta(eta)} remaining</span>
+        {isDone && totalTook !== null && (
+          <span className="text-green-600 tabular-nums">finished in {formatDone(totalTook)}</span>
         )}
       </div>
       <div className="space-y-2">
         {steps.map(step => {
           const tookMs = step.startedAt && step.endedAt ? step.endedAt - step.startedAt : null;
-
           return (
             <div key={step.id} className="flex items-start gap-2.5">
-              {step.status === 'running' && (
-                <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin mt-0.5 shrink-0" />
-              )}
-              {step.status === 'done' && (
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
-              )}
-              {step.status === 'error' && (
-                <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-              )}
-              {step.status === 'pending' && (
-                <Circle className="w-3.5 h-3.5 text-gray-600 mt-0.5 shrink-0" />
-              )}
+              {step.status === 'running' && <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin mt-0.5 shrink-0" />}
+              {step.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />}
+              {step.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />}
+              {step.status === 'pending' && <Circle className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />}
               <div className="flex items-baseline gap-2 flex-wrap flex-1">
                 <span className={
-                  step.status === 'running' ? 'text-amber-300' :
-                  step.status === 'done' ? 'text-green-300' :
-                  step.status === 'error' ? 'text-red-400' :
-                  'text-gray-500'
+                  step.status === 'running' ? 'text-amber-600' :
+                  step.status === 'done' ? 'text-green-700' :
+                  step.status === 'error' ? 'text-red-600' :
+                  'text-gray-400'
                 }>{step.text}</span>
-                {step.detail && (
-                  <span className="text-gray-500 text-xs">{step.detail}</span>
-                )}
+                {step.detail && <span className="text-gray-400 text-xs">{step.detail}</span>}
               </div>
-              {/* Show took time when done, or est time when pending */}
-              {tookMs !== null ? (
-                <span className="text-gray-600 text-xs shrink-0 tabular-nums ml-2">
-                  {formatDone(tookMs)}
-                </span>
-              ) : step.status === 'pending' ? (
-                <span className="text-gray-700 text-xs shrink-0 tabular-nums ml-2">
-                  est. {formatEta(stepEstimate(step.id))}
-                </span>
-              ) : null}
+              {tookMs !== null && (
+                <span className="text-gray-400 text-xs shrink-0 tabular-nums ml-2">{formatDone(tookMs)}</span>
+              )}
             </div>
           );
         })}
       </div>
-      <div ref={bottomRef} />
     </div>
   );
 }
 
 // ── Price Badge ───────────────────────────────────────────────────
-function PriceBadge({ price, currency, loading }: { price?: number | null; currency?: string; loading: boolean }) {
+function PriceBadge({ price, loading }: { price?: number | null; loading: boolean }) {
   if (loading) return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
       <Loader2 className="w-3 h-3 animate-spin" />
@@ -147,9 +140,8 @@ function PriceBadge({ price, currency, loading }: { price?: number | null; curre
   if (price != null) {
     const n = typeof price === 'number' ? price : parseFloat(String(price));
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-sm font-semibold text-green-700">
-        <DollarSign className="w-3.5 h-3.5" />
-        {currency || 'AED'} {isNaN(n) ? '—' : n.toFixed(2)}
+      <div className="px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-sm font-semibold text-green-700">
+        AED {isNaN(n) ? '—' : n.toFixed(2)}
       </div>
     );
   }
@@ -161,7 +153,7 @@ function PriceBadge({ price, currency, loading }: { price?: number | null; curre
 }
 
 // ── Main Page ─────────────────────────────────────────────────────
-type Phase = 'search' | 'processing' | 'results';
+type Phase = 'search' | 'processing' | 'review' | 'results';
 
 interface DiscoveryGroup {
   company: Company;
@@ -186,8 +178,8 @@ export function Discovering() {
   // Results
   const [results, setResults] = useState<DiscoveryGroup[]>([]);
   const [prices, setPrices] = useState<Record<string, PriceSnapshot | null | 'loading'>>({});
-
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Review selection: "companyId-matchIndex"
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     companiesApi.list().then(r => setCompanies(r.data)).catch(() => {});
@@ -204,10 +196,6 @@ export function Discovering() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showDropdown]);
-
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
 
   const filteredCompanies = companies.filter(c =>
     c.name.toLowerCase().includes(companySearch.toLowerCase())
@@ -251,7 +239,6 @@ export function Discovering() {
   const handleDiscover = async () => {
     if (!query.trim()) { toast.error('Enter a product name'); return; }
     if (selectedIds.length === 0) { toast.error('Select at least one marketplace'); return; }
-    if (pollRef.current) clearInterval(pollRef.current);
 
     setPhase('processing');
     setLogSteps([]);
@@ -305,13 +292,16 @@ export function Discovering() {
     await new Promise(r => setTimeout(r, 500));
 
     const newCount = validGroups.reduce(
-      (s, g) => s + g.matches.filter(m => !m.already_tracked && m.match).length, 0
+      (s, g) => s + g.matches.filter(m => !m.already_tracked && m.match && !sizeMismatch(m.found.name, m.match.product.internal_name)).length, 0
+    );
+    const skippedCount = validGroups.reduce(
+      (s, g) => s + g.matches.filter(m => !m.already_tracked && m.match && sizeMismatch(m.found.name, m.match.product.internal_name)).length, 0
     );
     const trackedCount = validGroups.reduce(
       (s, g) => s + g.matches.filter(m => m.already_tracked).length, 0
     );
     updateLog('match', 'done', 'AI matching complete',
-      `${newCount} new to track · ${trackedCount} already tracked`
+      `${newCount} new · ${trackedCount} tracked${skippedCount > 0 ? ` · ${skippedCount} size mismatch skipped` : ''}`
     );
 
     if (newCount === 0) {
@@ -321,36 +311,66 @@ export function Discovering() {
       return;
     }
 
-    // ── Step 3: Auto-save all new matched URLs ──────────────────
-    addLog('save', `Saving ${newCount} new URL${newCount !== 1 ? 's' : ''} to monitoring…`, 'running');
+    // ── Step 3: Transition to review — let user pick what to add ─
+    addLog('review', `Ready to review — ${newCount} new product${newCount !== 1 ? 's' : ''} to add`, 'done');
 
+    // Pre-select valid matches (no size mismatch, not already tracked)
+    const autoSelected = new Set<string>();
+    validGroups.forEach(({ company, matches }) => {
+      matches.forEach((m, i) => {
+        if (!m.already_tracked && m.match && !sizeMismatch(m.found.name, m.match.product.internal_name)) {
+          autoSelected.add(`${company.id}-${i}`);
+        }
+      });
+    });
+
+    setSelected(autoSelected);
+    setResults(validGroups);
+    setPhase('review');
+  };
+
+  const handleSaveSelected = async () => {
     const toSave: Array<{
       companyId: number;
       product_id: number;
       url: string;
       image_url?: string | null;
+      price?: number | null;
+      original_price?: number | null;
+      currency?: string;
+      availability?: string;
       key: string;
     }> = [];
 
-    validGroups.forEach(({ company, matches }) => {
+    results.forEach(({ company, matches }) => {
       matches.forEach((m, i) => {
-        if (!m.already_tracked && m.match) {
+        const key = `${company.id}-${i}`;
+        if (selected.has(key) && m.match && !m.already_tracked) {
           toSave.push({
             companyId: company.id,
             product_id: m.match.product.id,
             url: m.found.url,
             image_url: m.found.imageUrl,
-            key: `${company.id}-${i}`,
+            price: m.found.price,
+            original_price: m.found.original_price,
+            currency: m.found.currency,
+            availability: m.found.availability,
+            key,
           });
         }
       });
     });
 
-    const grouped = toSave.reduce((acc, { companyId, product_id, url, image_url }) => {
+    if (toSave.length === 0) { toast.error('Select at least one product'); return; }
+
+    setPhase('results');
+    addLog('save', `Saving ${toSave.length} URL${toSave.length !== 1 ? 's' : ''} to monitoring…`, 'running');
+
+    const grouped = toSave.reduce((acc, { companyId, product_id, url, image_url, price, original_price, currency, availability }) => {
       if (!acc[companyId]) acc[companyId] = [];
-      acc[companyId].push({ product_id, url, image_url });
+      acc[companyId].push({ product_id, url, image_url, price, original_price, currency, availability });
       return acc;
-    }, {} as Record<number, Array<{ product_id: number; url: string; image_url?: string | null }>>);
+    }, {} as Record<number, Array<{ product_id: number; url: string; image_url?: string | null; price?: number | null; original_price?: number | null; currency?: string; availability?: string }>>);
 
     let savedCount = 0;
     try {
@@ -358,97 +378,52 @@ export function Discovering() {
         const res = await discoveryApi.confirm(Number(cId), mappings);
         savedCount += res.data.added;
       }
-      updateLog('save', 'done', `Saved ${savedCount} new URL${savedCount !== 1 ? 's' : ''}`, '');
+      updateLog('save', 'done', `Saved ${savedCount} URL${savedCount !== 1 ? 's' : ''}`, '');
     } catch {
       updateLog('save', 'error', 'Failed to save URLs', '');
-      setResults(validGroups);
-      setPhase('results');
       return;
     }
 
-    // ── Step 4: Show results + start price scraping ─────────────
-    addLog('price', 'Fetching live prices…', 'running');
+    // Prices already came from discovery — populate directly, no scrape needed
+    const priceMap: Record<string, PriceSnapshot | null> = {};
+    toSave.forEach(x => {
+      priceMap[x.key] = x.price != null ? {
+        id: 0,
+        product_id: x.product_id,
+        company_id: x.companyId,
+        product_company_url_id: null,
+        title_found: null,
+        price: x.price,
+        original_price: x.original_price ?? null,
+        currency: x.currency ?? 'AED',
+        availability: x.availability ?? 'unknown',
+        raw_price_text: null,
+        raw_availability_text: null,
+        scrape_status: 'success',
+        error_message: null,
+        checked_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        internal_name: '',
+        company_name: '',
+        image_url: x.image_url ?? null,
+        product_url: x.url,
+      } : null;
+    });
+    setPrices(priceMap);
 
-    // Mark all new matches as loading price
-    const loadingPrices: Record<string, 'loading'> = {};
-    toSave.forEach(x => { loadingPrices[x.key] = 'loading'; });
-    setPrices(loadingPrices);
-
-    // Show results now, prices will fill in
-    setResults(validGroups);
-    setPhase('results');
-
-    try {
-      const productIds = [...new Set(toSave.map(x => x.product_id))];
-      const companyIds = [...new Set(toSave.map(x => x.companyId))];
-
-      // Find newly created URL IDs
-      const urlIds: number[] = [];
-      for (const cId of companyIds) {
-        const res = await urlsApi.list({ company_id: cId, limit: 500 });
-        res.data.forEach(u => {
-          if (productIds.includes(u.product_id)) urlIds.push(u.id);
-        });
-      }
-
-      if (urlIds.length === 0) {
-        updateLog('price', 'done', 'No URLs to scrape', '');
-        return;
-      }
-
-      const scrapeRes = await scraperApi.runMany(urlIds);
-      const runId = scrapeRes.data.run_id;
-
-      // Poll scrape progress
-      pollRef.current = setInterval(async () => {
-        try {
-          const run = await syncRunsApi.get(runId);
-          const done = run.data.success_count + run.data.fail_count;
-          const total = run.data.total_checked || urlIds.length;
-
-          updateLog('price', 'running', 'Fetching live prices…', `${done}/${total} checked`);
-
-          if (run.data.status !== 'running') {
-            clearInterval(pollRef.current!);
-            updateLog('price', 'done', 'Live prices fetched', `${run.data.success_count} successful`);
-            addLog('alldone', `Discovery complete! ${savedCount} product${savedCount !== 1 ? 's' : ''} added to monitoring.`, 'done');
-
-            // Load final prices
-            const snap = await snapshotsApi.latest();
-            const byKey: Record<string, PriceSnapshot> = {};
-            snap.data.forEach(s => { byKey[`${s.company_id}-${s.product_id}`] = s; });
-
-            setPrices(prev => {
-              const next = { ...prev };
-              validGroups.forEach(({ company, matches }) => {
-                matches.forEach((m, i) => {
-                  const key = `${company.id}-${i}`;
-                  if (prev[key] === 'loading' && m.match) {
-                    const found = byKey[`${company.id}-${m.match.product.id}`];
-                    next[key] = found ?? null;
-                  }
-                });
-              });
-              return next;
-            });
-          }
-        } catch {
-          clearInterval(pollRef.current!);
-          updateLog('price', 'error', 'Price fetch failed', '');
-        }
-      }, 2000);
-    } catch {
-      updateLog('price', 'error', 'Failed to start price fetch', '');
-    }
+    addLog('alldone', `Done! ${savedCount} product${savedCount !== 1 ? 's' : ''} added to monitoring.`, 'done');
   };
 
   const handleNewSearch = () => {
-    if (pollRef.current) clearInterval(pollRef.current);
     setPhase('search');
     setResults([]);
     setPrices({});
     setLogSteps([]);
+    setSelected(new Set());
   };
+
+  const toggleSelect = (key: string) =>
+    setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -468,26 +443,39 @@ export function Discovering() {
           {/* Search card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 mb-5">
             {phase !== 'search' ? (
-              /* Compact summary when processing or done */
-              <div className="flex items-center justify-between gap-4">
+              /* Compact summary when processing / review / results */
+              <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-sm font-medium">
                     {phase === 'processing' && <span className="text-amber-600 mr-2">●</span>}
+                    {phase === 'review' && <span className="text-blue-500 mr-2">◆</span>}
                     "{query}"
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {selectedCompanies.map(c => c.name).join(', ')}
                   </p>
                 </div>
-                {phase === 'results' && (
-                  <button
-                    onClick={handleNewSearch}
-                    className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shrink-0"
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                    New Search
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {(phase === 'review' || phase === 'results') && (
+                    <button
+                      onClick={handleNewSearch}
+                      className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shrink-0"
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      New Search
+                    </button>
+                  )}
+                  {phase === 'review' && (
+                    <button
+                      onClick={handleSaveSelected}
+                      disabled={selected.size === 0}
+                      className="flex items-center gap-2 px-5 py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors shrink-0 font-medium"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Add {selected.size} to Monitoring & Get Prices
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               /* Full search form */
@@ -595,14 +583,38 @@ export function Discovering() {
             </div>
           )}
 
-          {/* Results */}
-          {phase === 'results' && results.map(({ company, matches }) => (
+          {/* Results / Review */}
+          {(phase === 'review' || phase === 'results') && results.map(({ company, matches }) => {
+            const selectableKeys = matches
+              .map((m, i) => ({ m, key: `${company.id}-${i}` }))
+              .filter(({ m }) => !m.already_tracked && m.match && !sizeMismatch(m.found.name, m.match.product.internal_name))
+              .map(({ key }) => key);
+            const allChecked = selectableKeys.length > 0 && selectableKeys.every(k => selected.has(k));
+
+            return (
             <div key={company.id} className="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
-              <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
-                <span className="font-semibold text-sm">{company.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {matches.length} result{matches.length !== 1 ? 's' : ''}
-                </span>
+              <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm">{company.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {matches.length} result{matches.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {phase === 'review' && selectableKeys.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelected(prev => {
+                        const n = new Set(prev);
+                        if (allChecked) selectableKeys.forEach(k => n.delete(k));
+                        else selectableKeys.forEach(k => n.add(k));
+                        return n;
+                      });
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {allChecked ? 'Deselect all' : 'Select all'}
+                  </button>
+                )}
               </div>
 
               <div className="divide-y divide-gray-50">
@@ -611,15 +623,48 @@ export function Discovering() {
                   const isTracked = m.already_tracked;
                   const priceState = prices[key];
 
+                  // prefer snapshot image (from scrape) over discovery image
+                  const resolvedImage = (priceState && priceState !== 'loading' && priceState.image_url)
+                    ? priceState.image_url
+                    : m.found.imageUrl ?? null;
+                  const isSizeMismatch = !isTracked && m.match
+                    ? sizeMismatch(m.found.name, m.match.product.internal_name)
+                    : false;
+
                   return (
                     <div
                       key={key}
-                      className={`p-4 flex items-start gap-3 sm:gap-4 transition-colors ${isTracked ? 'opacity-55' : ''}`}
+                      className={`p-4 flex items-center gap-3 sm:gap-4 transition-colors ${
+                        isTracked ? 'opacity-55' : isSizeMismatch ? 'bg-red-50/40' : ''
+                      }`}
                     >
-                      {/* Status dot */}
-                      <div className="pt-1 shrink-0">
-                        {isTracked ? (
+                      {/* Image — shown once price or discovery image is available */}
+                      {resolvedImage ? (
+                        <img
+                          src={resolvedImage}
+                          alt={cleanName(m.found.name)}
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 bg-gray-100"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 shrink-0" />
+                      )}
+
+                      {/* Checkbox (review) or status dot (results) */}
+                      <div className="shrink-0">
+                        {phase === 'review' && !isTracked && !isSizeMismatch && m.match ? (
+                          <button
+                            onClick={() => toggleSelect(key)}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                              selected.has(key) ? 'bg-black border-black' : 'border-gray-300 hover:border-gray-500'
+                            }`}
+                          >
+                            {selected.has(key) && <Check className="w-3 h-3 text-white" />}
+                          </button>
+                        ) : isTracked ? (
                           <Check className="w-4 h-4 text-green-500" />
+                        ) : isSizeMismatch ? (
+                          <AlertTriangle className="w-4 h-4 text-red-500" />
                         ) : m.match ? (
                           <div className="w-4 h-4 rounded-full bg-black flex items-center justify-center">
                             <Check className="w-2.5 h-2.5 text-white" />
@@ -629,29 +674,21 @@ export function Discovering() {
                         )}
                       </div>
 
-                      {/* Image */}
-                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
-                        {m.found.imageUrl ? (
-                          <img
-                            src={m.found.imageUrl}
-                            alt={m.found.name}
-                            className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <Package className="w-6 h-6 text-gray-300" />
-                        )}
-                      </div>
-
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold mb-0.5 leading-snug">{m.found.name}</p>
+                        <p className="text-sm font-semibold mb-0.5 leading-snug">{cleanName(m.found.name)}</p>
                         {m.match ? (
                           <p className="text-xs text-muted-foreground mb-1">
-                            Matched: <span className="text-foreground">{m.match.product.internal_name}</span>
-                            <span className="ml-1.5 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">
-                              {Math.round(m.match.confidence * 100)}% match
-                            </span>
+                            Matched: <span className={isSizeMismatch ? 'text-red-600 line-through' : 'text-foreground'}>{m.match.product.internal_name}</span>
+                            {isSizeMismatch ? (
+                              <span className="ml-1.5 px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-medium">
+                                ⚠ size mismatch — skipped
+                              </span>
+                            ) : (
+                              <span className="ml-1.5 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">
+                                {Math.round(m.match.confidence * 100)}% match
+                              </span>
+                            )}
                           </p>
                         ) : (
                           <p className="text-xs text-amber-600 mb-1">No match in catalog</p>
@@ -676,8 +713,9 @@ export function Discovering() {
                           <PriceBadge
                             loading={priceState === 'loading'}
                             price={priceState !== 'loading' ? priceState?.price : undefined}
-                            currency={priceState !== 'loading' ? priceState?.currency : undefined}
                           />
+                        ) : m.found.price != null ? (
+                          <PriceBadge loading={false} price={m.found.price} />
                         ) : null}
                       </div>
                     </div>
@@ -685,7 +723,7 @@ export function Discovering() {
                 })}
               </div>
             </div>
-          ))}
+          ); })}
         </div>
       </div>
     </div>

@@ -8,14 +8,16 @@
  *   2. Extract ALL anchor links from the page (no hardcoded selectors)
  *   3. Send links + internal catalog to Claude in one call
  *   4. Claude intelligently identifies product links and matches them to the catalog
- *   5. Fall back to fuzzy matching if no API key
+ *   5. Immediately visit each matched product page and extract price/image (one shot)
+ *   6. Fall back to fuzzy matching if no API key
  */
 
-const { query }          = require('../db');
-const ScraperEngine      = require('../scraper/engine');
-const { getSearchConfig }= require('../scraper/searchConfigs');
-const { fuzzyMatch }     = require('./matchingService');
-const logger             = require('../utils/logger');
+const { query }                             = require('../db');
+const ScraperEngine                         = require('../scraper/engine');
+const { getSearchConfig }                   = require('../scraper/searchConfigs');
+const { fuzzyMatch }                        = require('./matchingService');
+const { extractWithVision, extractImageUrl }= require('../scraper/aiScraper');
+const logger                                = require('../utils/logger');
 
 // ── Website Probe (auto-detect search URL) ────────────────────────────────────
 
@@ -356,6 +358,66 @@ async function loadPage(engine, url, config) {
   return { page, context };
 }
 
+// ── scrapeProductPrices ───────────────────────────────────────────────────────
+
+/**
+ * For each matched result, open the product page in the same browser and extract
+ * price + image using Claude Vision. Runs with concurrency=3 to keep it fast.
+ *
+ * Mutates and returns matchResults with found.price / found.currency /
+ * found.availability / found.imageUrl / found.original_price filled in.
+ */
+async function scrapeProductPrices(engine, matchResults, currency, apiKey) {
+  const toScrape = matchResults.filter((r) => r.match && r.found && r.found.url);
+  if (toScrape.length === 0) return matchResults;
+
+  logger.info('[Discovery] Scraping product pages for prices', { count: toScrape.length });
+
+  const CONCURRENCY = 3;
+  const enriched    = new Map(matchResults.map((r, i) => [r.found.url, i]));
+  const out         = matchResults.map((r) => ({ ...r, found: { ...r.found } }));
+
+  for (let i = 0; i < toScrape.length; i += CONCURRENCY) {
+    await Promise.all(
+      toScrape.slice(i, i + CONCURRENCY).map(async (r) => {
+        const context = await engine.browser.newContext({
+          userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          locale:     'en-AE',
+          timezoneId: 'Asia/Dubai',
+          viewport:   { width: 1366, height: 768 },
+        });
+        const page = await context.newPage();
+        try {
+          await page
+            .goto(r.found.url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+            .catch(() => {});
+          await page.waitForTimeout(1500);
+
+          const [priceData, imageUrl] = await Promise.all([
+            apiKey ? extractWithVision(page, currency, apiKey).catch(() => null) : Promise.resolve(null),
+            extractImageUrl(page).catch(() => null),
+          ]);
+
+          const idx = enriched.get(r.found.url);
+          if (idx !== undefined) {
+            out[idx].found.imageUrl       = imageUrl   || null;
+            out[idx].found.price          = priceData?.price          ?? null;
+            out[idx].found.original_price = priceData?.originalPrice  ?? null;
+            out[idx].found.currency       = priceData?.currency       || currency;
+            out[idx].found.availability   = priceData?.availability   || 'unknown';
+          }
+        } catch (err) {
+          logger.warn('[Discovery] Product page scrape failed', { url: r.found.url, error: err.message });
+        } finally {
+          await context.close();
+        }
+      })
+    );
+  }
+
+  return out;
+}
+
 // ── discoverProducts ──────────────────────────────────────────────────────────
 
 async function discoverProducts(companyId, searchQuery = 'marvis') {
@@ -452,6 +514,12 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
     }
 
     await context.close();
+
+    // ── 6. Scrape each matched product page for price + image ──────────────
+    if (matchResults.some((r) => r.match)) {
+      matchResults = await scrapeProductPrices(engine, matchResults, 'AED', apiKey);
+    }
+
   } finally {
     await engine.close();
   }
@@ -491,16 +559,41 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
 
 async function confirmMappings(companyId, mappings) {
   let added = 0;
-  for (const { product_id, url, image_url } of mappings) {
-    await query(
+  for (const { product_id, url, image_url, price, original_price, currency, availability } of mappings) {
+    // Upsert URL mapping, return the row id
+    const { rows } = await query(
       `INSERT INTO product_company_urls (product_id, company_id, product_url, image_url, is_active)
        VALUES ($1, $2, $3, $4, true)
        ON CONFLICT (product_id, company_id)
        DO UPDATE SET product_url = EXCLUDED.product_url,
                      image_url   = COALESCE(EXCLUDED.image_url, product_company_urls.image_url),
-                     is_active   = true`,
+                     is_active   = true
+       RETURNING id`,
       [product_id, companyId, url, image_url || null]
     );
+
+    const urlId = rows[0]?.id;
+
+    // If we already have a price from discovery, save it as the initial snapshot
+    if (urlId && price != null) {
+      await query(
+        `INSERT INTO price_snapshots
+           (product_id, company_id, product_company_url_id,
+            price, original_price, currency, availability,
+            raw_price_text, scrape_status, checked_at, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'success',NOW(),NOW())
+         ON CONFLICT DO NOTHING`,
+        [
+          product_id, companyId, urlId,
+          price,
+          original_price || null,
+          currency || 'AED',
+          availability || 'unknown',
+          String(price),
+        ]
+      ).catch((err) => logger.warn('[Discovery] Snapshot insert failed', { err: err.message }));
+    }
+
     added++;
   }
   logger.info('[Discovery] Confirmed mappings', { companyId, added });
