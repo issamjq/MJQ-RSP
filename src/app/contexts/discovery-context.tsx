@@ -70,7 +70,6 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
 
   const _saved = loadSession();
-  // If refresh happened mid-scan, reset to search. Otherwise restore.
   const _wasScanning = _saved?.phase === 'processing';
   const [phase, setPhase] = useState<Phase>(_wasScanning ? 'search' : (_saved?.phase ?? 'search'));
   const [query, setQuery] = useState<string>(_saved?.query ?? '');
@@ -80,6 +79,8 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
   const [results, setResults] = useState<DiscoveryGroup[]>(_wasScanning ? [] : (_saved?.results ?? []));
   const [prices, setPrices] = useState<Record<string, PriceSnapshot | null | 'loading'>>(_wasScanning ? {} : (_saved?.prices ?? {}));
   const [selected, setSelected] = useState<Set<string>>(new Set(_wasScanning ? [] : (_saved?.selected ?? [])));
+  // Flag to auto-restart a scan that was interrupted by a refresh
+  const [pendingAutoScan, setPendingAutoScan] = useState<boolean>(_wasScanning && !!_saved?.query && (_saved?.selectedIds?.length ?? 0) > 0);
 
   // Persist state to sessionStorage whenever it changes
   useEffect(() => {
@@ -232,6 +233,14 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
     setResults(validGroups);
     setPhase('review');
   }, [query, selectedIds, companies, addLog, updateLog]);
+
+  // Auto-restart a scan that was interrupted by a page refresh
+  useEffect(() => {
+    if (pendingAutoScan && companies.length > 0) {
+      setPendingAutoScan(false);
+      handleDiscover();
+    }
+  }, [pendingAutoScan, companies, handleDiscover]);
 
   const handleSaveSelected = useCallback(async () => {
     const toSave: Array<{
