@@ -7,6 +7,7 @@ import { Products } from './pages/products';
 import { PriceBoard, TrackedUrls } from './pages/monitoring';
 import { Discovering } from './pages/discovering';
 import { Settings } from './pages/settings';
+import { UsersPage } from './pages/users';
 import { ErrorPage } from './pages/error-page';
 
 export const router = createBrowserRouter([
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: '/monitoring', element: <Navigate to='/price-board' replace /> },
       { path: '/discovering', Component: Discovering, errorElement: <ErrorPage /> },
       { path: '/settings', Component: Settings, errorElement: <ErrorPage /> },
+      { path: '/users', Component: UsersPage, errorElement: <ErrorPage /> },
       { path: '*', element: <Navigate to='/overview' replace /> },
     ],
   },

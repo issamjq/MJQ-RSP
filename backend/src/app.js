@@ -16,6 +16,7 @@ const syncRunsRouter          = require('./routes/syncRuns');
 const scraperRouter           = require('./routes/scraper');
 const discoveryRouter         = require('./routes/discovery');
 const statsRouter             = require('./routes/stats');
+const usersRouter             = require('./routes/users');
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/sync-runs',            syncRunsRouter);
 app.use('/api/scraper',              scraperRouter);
 app.use('/api/discovery',            discoveryRouter);
 app.use('/api/stats',                statsRouter);
+app.use('/api/users',                usersRouter);
 
 // ── Error handling (must be last) ────────────────────────────────
 app.use(notFoundHandler);

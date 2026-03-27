@@ -201,3 +201,34 @@ export const statsApi = {
   get: () =>
     api.get<ApiResponse<{ companies: number; products: number; tracked_urls: number; last_sync_rate: number; last_sync_succeeded: number; last_sync_total: number }>>("/api/stats"),
 };
+
+export const ROLES: Record<string, string> = {
+  '001': 'Dev',
+  '002': 'Tester',
+  '003': 'Super Admin',
+  '004': 'Admin',
+  '005': 'Sales',
+  '006': 'Finance Department',
+  '007': 'Sourcing & Procurement',
+  '008': 'Merchandiser',
+};
+
+export interface AllowedUser {
+  id: number;
+  email: string;
+  name: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const usersApi = {
+  me: () => api.get<ApiResponse<AllowedUser>>('/api/users/me'),
+  list: () => api.get<ApiResponse<AllowedUser[]>>('/api/users'),
+  create: (body: { email: string; name?: string; role?: string; is_active?: boolean }) =>
+    api.post<ApiResponse<AllowedUser>>('/api/users', body),
+  update: (id: number, body: Partial<Pick<AllowedUser, 'name' | 'role' | 'is_active'>>) =>
+    api.put<ApiResponse<AllowedUser>>(`/api/users/${id}`, body),
+  delete: (id: number) => api.del<ApiResponse<null>>(`/api/users/${id}`),
+};

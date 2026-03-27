@@ -682,7 +682,7 @@ function PricesTab() {
                       <table className="w-full">
                         <thead className="border-b border-gray-50">
                           <tr>
-                            <th className="w-10 px-4 py-2">
+                            <th className="w-10 px-4 py-2 align-middle">
                               <input
                                 type="checkbox"
                                 checked={items.length > 0 && items.every(s => selectedRows.has(s.id))}
@@ -691,7 +691,7 @@ function PricesTab() {
                                   const allChk = items.every(s => selectedRows.has(s.id));
                                   setSelectedRows(prev => { const n = new Set(prev); items.forEach(s => allChk ? n.delete(s.id) : n.add(s.id)); return n; });
                                 }}
-                                className="rounded w-4 h-4"
+                                className="rounded w-4 h-4 block"
                               />
                             </th>
                             <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10 whitespace-nowrap">#</th>
@@ -722,10 +722,10 @@ function PricesTab() {
                             const storeLogo = storeMap.get(snap.company_id)?.logo_url;
                             return (
                               <tr key={snap.id} className={`transition-colors ${isSelected ? 'bg-amber-50/40' : 'hover:bg-gray-50/50'}`}>
-                                <td className="px-4 py-2.5">
-                                  <input type="checkbox" checked={isSelected} onChange={() => toggleRow(snap.id)} className="rounded w-4 h-4" />
+                                <td className="w-10 px-4 py-2 align-middle">
+                                  <input type="checkbox" checked={isSelected} onChange={() => toggleRow(snap.id)} className="rounded w-4 h-4 block" />
                                 </td>
-                                <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums">{idx}</td>
+                                <td className="w-10 px-3 py-2 text-xs text-muted-foreground tabular-nums align-middle">{idx}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center gap-2">
                                     {storeLogo && (

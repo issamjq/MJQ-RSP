@@ -1,8 +1,9 @@
-import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, TrendingUp, Link as LinkIcon, Menu, X } from 'lucide-react';
+import { Home, Building2, Package, Compass, Settings, ChevronDown, ChevronLeft, LogOut, TrendingUp, Link as LinkIcon, Menu, X, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { logout } from '../../lib/firebase';
 import { toast } from 'sonner';
+import { useUser } from '../contexts/user-context';
 
 const NAV_ITEMS = [
   { icon: Home, label: 'Dashboard', path: '/overview' },
@@ -11,40 +12,8 @@ const NAV_ITEMS = [
   { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
   { icon: Package, label: 'Products', path: '/products' },
   { icon: Building2, label: 'Stores', path: '/companies' },
+  { icon: Users, label: 'Users', path: '/users' },
   { icon: Settings, label: 'Settings', path: '/settings' },
-];
-
-const SECTIONS = [
-  {
-    key: 'ai',
-    label: 'AI',
-    items: [
-      { icon: Compass, label: 'Market Discovery', path: '/discovering' },
-    ],
-  },
-  {
-    key: 'monitoring',
-    label: 'Monitoring',
-    items: [
-      { icon: TrendingUp, label: 'Price Activity', path: '/price-board' },
-      { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
-    ],
-  },
-  {
-    key: 'catalog',
-    label: 'Catalog',
-    items: [
-      { icon: Package, label: 'Products', path: '/products' },
-      { icon: Building2, label: 'Stores', path: '/companies' },
-    ],
-  },
-  {
-    key: 'system',
-    label: 'System',
-    items: [
-      { icon: Settings, label: 'Settings', path: '/settings' },
-    ],
-  },
 ];
 
 export function AppSidebar() {
@@ -53,6 +22,41 @@ export function AppSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { appUser, roleName, isManagement } = useUser();
+
+  const SECTIONS = [
+    {
+      key: 'ai',
+      label: 'AI',
+      items: [
+        { icon: Compass, label: 'Market Discovery', path: '/discovering' },
+      ],
+    },
+    {
+      key: 'monitoring',
+      label: 'Monitoring',
+      items: [
+        { icon: TrendingUp, label: 'Price Activity', path: '/price-board' },
+        { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
+      ],
+    },
+    {
+      key: 'catalog',
+      label: 'Catalog',
+      items: [
+        { icon: Package, label: 'Products', path: '/products' },
+        { icon: Building2, label: 'Stores', path: '/companies' },
+      ],
+    },
+    {
+      key: 'system',
+      label: 'System',
+      items: [
+        ...(isManagement ? [{ icon: Users, label: 'Users', path: '/users' }] : []),
+        { icon: Settings, label: 'Settings', path: '/settings' },
+      ],
+    },
+  ];
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
@@ -68,6 +72,19 @@ export function AppSidebar() {
   const lc = (path: string) =>
     'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ' +
     (isActive(path) ? 'bg-accent/60 text-foreground' : 'text-muted-foreground hover:bg-accent/30 hover:text-foreground');
+
+  const visibleNavItems = isManagement ? NAV_ITEMS : NAV_ITEMS.filter(i => i.path !== '/users');
+
+  const UserFooter = () => (
+    <div className="space-y-1">
+      {appUser && (
+        <div className="px-3 py-2 mb-1">
+          <p className="text-xs font-medium text-foreground truncate">{appUser.name || appUser.email}</p>
+          <p className="text-[10px] text-muted-foreground">{appUser.role} · {roleName}</p>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -101,7 +118,6 @@ export function AppSidebar() {
               </button>
             </div>
             <nav className="flex-1 px-3 py-4 overflow-y-auto">
-              {/* Dashboard — standalone */}
               <ul className="space-y-0.5 mb-4">
                 <li>
                   <Link to="/overview" className={'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ' + (isActive('/overview') ? 'bg-accent/60 text-foreground font-medium' : 'text-muted-foreground hover:bg-accent/30 hover:text-foreground')}>
@@ -109,7 +125,6 @@ export function AppSidebar() {
                   </Link>
                 </li>
               </ul>
-              {/* Grouped sections */}
               {SECTIONS.map(section => (
                 <div key={section.key} className="mb-4">
                   <button
@@ -133,11 +148,12 @@ export function AppSidebar() {
                 </div>
               ))}
             </nav>
-            <div className="p-4 border-t border-gray-100 space-y-1">
+            <div className="p-4 border-t border-gray-100">
+              <UserFooter />
               <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/30">
                 <LogOut className="w-4 h-4" /><span>Log out</span>
               </button>
-              <p className="text-[10px] text-muted-foreground px-3">v1.0.9</p>
+              <p className="text-[10px] text-muted-foreground px-3 mt-1">v1.0.9</p>
             </div>
           </div>
         </>
@@ -152,7 +168,7 @@ export function AppSidebar() {
             </div>
           </div>
           <nav className="flex-1 px-2 space-y-1 mt-2">
-            {NAV_ITEMS.map(item => (
+            {visibleNavItems.map(item => (
               <Link
                 key={item.label}
                 to={item.path}
@@ -187,7 +203,6 @@ export function AppSidebar() {
             </div>
           </div>
           <nav className="flex-1 px-3 overflow-y-auto">
-            {/* Dashboard — standalone */}
             <ul className="space-y-0.5 mb-4">
               <li>
                 <Link to="/overview" className={lc('/overview')}>
@@ -195,8 +210,6 @@ export function AppSidebar() {
                 </Link>
               </li>
             </ul>
-
-            {/* Grouped sections */}
             {SECTIONS.map(section => (
               <div key={section.key} className="mb-4">
                 <button
@@ -220,8 +233,9 @@ export function AppSidebar() {
               </div>
             ))}
           </nav>
-          <div className="p-4 mt-auto">
-            <div className="space-y-1">
+          <div className="p-4 mt-auto border-t border-gray-100">
+            <UserFooter />
+            <div className="space-y-1 mt-1">
               <button onClick={() => setCollapsed(true)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent/30">
                 <ChevronLeft className="w-3.5 h-3.5" /><span>Collapse sidebar</span>
               </button>

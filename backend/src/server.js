@@ -14,6 +14,16 @@ async function runMigrations() {
     `ALTER TABLE price_snapshots ADD COLUMN IF NOT EXISTS original_price NUMERIC(12,2)`,
     // Add initial_rsp to products
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS initial_rsp NUMERIC(10,2)`,
+    // Allowed users table for access control
+    `CREATE TABLE IF NOT EXISTS allowed_users (
+      id         SERIAL PRIMARY KEY,
+      email      VARCHAR(255) NOT NULL UNIQUE,
+      name       VARCHAR(255),
+      role       VARCHAR(50)  NOT NULL DEFAULT '008',
+      is_active  BOOLEAN      NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`,
   ];
   for (const sql of migrations) {
     try {
