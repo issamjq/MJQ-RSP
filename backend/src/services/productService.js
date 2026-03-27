@@ -80,19 +80,19 @@ async function getById(id) {
   return rows[0] || null;
 }
 
-async function create({ internal_name, internal_sku, barcode, brand, category, image_url, notes, is_active = true }) {
+async function create({ internal_name, internal_sku, barcode, brand, category, image_url, initial_rsp, notes, is_active = true }) {
   const { rows } = await db.query(
-    `INSERT INTO products (internal_name, internal_sku, barcode, brand, category, image_url, notes, is_active)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO products (internal_name, internal_sku, barcode, brand, category, image_url, initial_rsp, notes, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING *`,
     [internal_name, internal_sku || null, barcode || null, brand || null,
-     category || null, image_url || null, notes || null, is_active]
+     category || null, image_url || null, initial_rsp != null ? Number(initial_rsp) : null, notes || null, is_active]
   );
   return rows[0];
 }
 
 async function update(id, fields) {
-  const allowed = ['internal_name', 'internal_sku', 'barcode', 'brand', 'category', 'image_url', 'notes', 'is_active'];
+  const allowed = ['internal_name', 'internal_sku', 'barcode', 'brand', 'category', 'image_url', 'initial_rsp', 'notes', 'is_active'];
   const keys    = Object.keys(fields).filter((k) => allowed.includes(k));
   if (!keys.length) return getById(id);
 
@@ -116,19 +116,20 @@ async function bulkImport(items) {
   for (const item of items) {
     if (!item.internal_name || !item.internal_sku) continue;
     const { rows } = await db.query(
-      `INSERT INTO products (internal_name, internal_sku, barcode, brand, image_url, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO products (internal_name, internal_sku, barcode, brand, image_url, initial_rsp, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (internal_sku) DO UPDATE SET
          internal_name = EXCLUDED.internal_name,
          barcode       = EXCLUDED.barcode,
          brand         = EXCLUDED.brand,
          image_url     = EXCLUDED.image_url,
+         initial_rsp   = EXCLUDED.initial_rsp,
          is_active     = EXCLUDED.is_active,
          updated_at    = NOW()
        RETURNING (xmax = 0) AS inserted`,
       [item.internal_name, String(item.internal_sku),
        item.barcode || null, item.brand || null,
-       item.image_url || null, item.is_active ?? true]
+       item.image_url || null, item.initial_rsp != null ? Number(item.initial_rsp) : null, item.is_active ?? true]
     );
     if (rows[0]?.inserted) inserted++; else updated++;
   }

@@ -46,11 +46,15 @@ CREATE TABLE IF NOT EXISTS products (
   brand         VARCHAR(100),
   category      VARCHAR(100),
   image_url     VARCHAR(500),
+  initial_rsp   NUMERIC(10,2),
   notes         TEXT,
   is_active     BOOLEAN NOT NULL DEFAULT true,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add initial_rsp to existing deployments
+ALTER TABLE products ADD COLUMN IF NOT EXISTS initial_rsp NUMERIC(10,2);
 
 CREATE INDEX IF NOT EXISTS idx_products_sku        ON products(internal_sku);
 CREATE INDEX IF NOT EXISTS idx_products_barcode    ON products(barcode);

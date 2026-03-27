@@ -19,6 +19,7 @@ export interface Product {
   brand: string | null;
   category: string | null;
   image_url: string | null;
+  initial_rsp: number | null;
   notes: string | null;
   is_active: boolean;
   url_count?: number;
@@ -121,7 +122,7 @@ export const productsApi = {
   list: (params?: { page?: number; limit?: number; search?: string; is_active?: boolean }) =>
     api.get<PaginatedResponse<Product>>("/api/products", params as Record<string, string | number | boolean | undefined>),
   get: (id: number) => api.get<ApiResponse<Product>>(`/api/products/${id}`),
-  create: (body: { internal_name: string; internal_sku?: string; barcode?: string; brand?: string; category?: string; image_url?: string }) =>
+  create: (body: { internal_name: string; internal_sku?: string; barcode?: string; brand?: string; category?: string; image_url?: string; initial_rsp?: number | null }) =>
     api.post<ApiResponse<Product>>("/api/products", body),
   update: (id: number, body: Partial<Product>) =>
     api.put<ApiResponse<Product>>(`/api/products/${id}`, body),

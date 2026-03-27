@@ -48,7 +48,7 @@ export function Products() {
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '' });
+  const [form, setForm] = useState({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '', initial_rsp: '' });
   const csvRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (q?: string) => {
@@ -71,13 +71,13 @@ export function Products() {
 
   const openAdd = () => {
     setEditTarget(null);
-    setForm({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '' });
+    setForm({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '', initial_rsp: '' });
     setShowModal(true);
   };
 
   const openEdit = (p: Product) => {
     setEditTarget(p);
-    setForm({ internal_name: p.internal_name, brand: p.brand || '', internal_sku: p.internal_sku || '', barcode: p.barcode || '', image_url: p.image_url || '' });
+    setForm({ internal_name: p.internal_name, brand: p.brand || '', internal_sku: p.internal_sku || '', barcode: p.barcode || '', image_url: p.image_url || '', initial_rsp: p.initial_rsp != null ? String(p.initial_rsp) : '' });
     setShowModal(true);
   };
 
@@ -86,11 +86,12 @@ export function Products() {
     if (!form.internal_name.trim()) { toast.error('Product name is required'); return; }
     setSaving(true);
     try {
+      const rsp = form.initial_rsp.trim() ? Number(form.initial_rsp) : null;
       if (editTarget) {
-        await productsApi.update(editTarget.id, { internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined });
+        await productsApi.update(editTarget.id, { internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined, initial_rsp: rsp });
         toast.success('Product updated');
       } else {
-        await productsApi.create({ internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined });
+        await productsApi.create({ internal_name: form.internal_name, brand: form.brand || undefined, internal_sku: form.internal_sku || undefined, barcode: form.barcode || undefined, image_url: form.image_url || undefined, initial_rsp: rsp });
         toast.success('Product added');
       }
       setShowModal(false);
@@ -126,6 +127,7 @@ export function Products() {
         barcode: r['SKU'] || r['barcode'] || '',
         brand: r['Brand'] || r['brand'] || '',
         image_url: r['ImageUrl'] || r['image_url'] || '',
+        initial_rsp: r['Initial RSP'] || r['initial_rsp'] || '',
         is_active: (r['Is Visible'] || r['is_active'] || 'true').toLowerCase() !== 'false',
       }))
       .filter(r => r.internal_name);
@@ -254,7 +256,10 @@ export function Products() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{product.internal_name}</p>
-                      {product.brand && <p className="text-xs text-muted-foreground mt-0.5">{product.brand}</p>}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {product.brand && <p className="text-xs text-muted-foreground">{product.brand}</p>}
+                        {product.initial_rsp != null && <p className="text-xs font-medium text-gray-700">AED {Number(product.initial_rsp).toFixed(2)}</p>}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => openEdit(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Edit className="w-4 h-4 text-gray-600" /></button>
@@ -272,6 +277,7 @@ export function Products() {
                       <th onClick={() => handleSort('brand')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Brand{si('brand')}</th>
                       <th onClick={() => handleSort('sku')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden md:table-cell">SKU{si('sku')}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Barcode</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Initial RSP</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
                   </thead>
@@ -295,6 +301,9 @@ export function Products() {
                         </td>
                         <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">{product.internal_sku || '—'}</td>
                         <td className="px-6 py-4 hidden lg:table-cell text-sm text-muted-foreground">{product.barcode || '—'}</td>
+                        <td className="px-6 py-4 hidden sm:table-cell text-sm font-medium">
+                          {product.initial_rsp != null ? `AED ${Number(product.initial_rsp).toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button onClick={() => openEdit(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Edit className="w-4 h-4 text-gray-600" /></button>
@@ -342,6 +351,10 @@ export function Products() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
                   <input type="url" value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://example.com/image.jpg" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Initial RSP <span className="text-muted-foreground font-normal">(AED)</span></label>
+                  <input type="number" min="0" step="0.01" value={form.initial_rsp} onChange={e => setForm(f => ({ ...f, initial_rsp: e.target.value }))} placeholder="0.00" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">Cancel</button>
