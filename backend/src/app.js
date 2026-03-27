@@ -15,6 +15,7 @@ const priceSnapshotsRouter    = require('./routes/priceSnapshots');
 const syncRunsRouter          = require('./routes/syncRuns');
 const scraperRouter           = require('./routes/scraper');
 const discoveryRouter         = require('./routes/discovery');
+const statsRouter             = require('./routes/stats');
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use('/api/price-snapshots',      priceSnapshotsRouter);
 app.use('/api/sync-runs',            syncRunsRouter);
 app.use('/api/scraper',              scraperRouter);
 app.use('/api/discovery',            discoveryRouter);
+app.use('/api/stats',                statsRouter);
 
 // ── Error handling (must be last) ────────────────────────────────
 app.use(notFoundHandler);

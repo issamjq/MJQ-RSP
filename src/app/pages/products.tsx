@@ -241,12 +241,35 @@ export function Products() {
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Mobile list */}
+              <div className="sm:hidden divide-y divide-gray-100">
+                {sortedProducts.map((product) => (
+                  <div key={product.id} className="flex items-center gap-3 px-4 py-3">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.internal_name} className="w-10 h-10 rounded-lg object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                        <Package className="w-5 h-5 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{product.internal_name}</p>
+                      {product.brand && <p className="text-xs text-muted-foreground mt-0.5">{product.brand}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => openEdit(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Edit className="w-4 h-4 text-gray-600" /></button>
+                      <button onClick={() => handleDelete(product)} className="p-1.5 hover:bg-gray-100 rounded transition-colors"><Trash2 className="w-4 h-4 text-red-600" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50/50 border-b border-gray-100">
                     <tr>
                       <th onClick={() => handleSort('name')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Product{si('name')}</th>
-                      <th onClick={() => handleSort('brand')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Brand{si('brand')}</th>
+                      <th onClick={() => handleSort('brand')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Brand{si('brand')}</th>
                       <th onClick={() => handleSort('sku')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden md:table-cell">SKU{si('sku')}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Barcode</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
@@ -264,10 +287,10 @@ export function Products() {
                                 <Package className="w-5 h-5 text-gray-400" />
                               </div>
                             )}
-                            <span className="font-medium text-sm max-w-xs truncate">{product.internal_name}</span>
+                            <span className="font-medium text-sm min-w-0 truncate">{product.internal_name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 hidden sm:table-cell">
+                        <td className="px-6 py-4">
                           {product.brand && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${brandColor(product.brand)}`}>{product.brand}</span>}
                         </td>
                         <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">{product.internal_sku || '—'}</td>
