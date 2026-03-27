@@ -104,7 +104,7 @@ export function Companies() {
               </button>
               <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm">
                 <Plus className="w-4 h-4" />
-                Add Company
+                Add
               </button>
             </div>
           </div>

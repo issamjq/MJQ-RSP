@@ -629,10 +629,19 @@ function PricesTab() {
 
                   {!isCollapsed && (
                     <div className="overflow-x-auto">
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
+                        <colgroup>
+                          <col className="w-10" />
+                          <col className="w-10" />
+                          <col />
+                          <col className="w-36" />
+                          <col className="w-28 hidden sm:table-column" />
+                          <col className="w-44 hidden lg:table-column" />
+                          <col className="w-16" />
+                        </colgroup>
                         <thead className="border-b border-gray-50">
                           <tr>
-                            <th className="w-10 px-4 py-2">
+                            <th className="px-4 py-2">
                               <input
                                 type="checkbox"
                                 checked={items.length > 0 && items.every(s => selectedRows.has(s.id))}
@@ -644,12 +653,12 @@ function PricesTab() {
                                 className="rounded w-4 h-4"
                               />
                             </th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10">#</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">#</th>
                             <th onClick={() => handlePriceSort('store')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Store Name{psi('store')}</th>
                             <th onClick={() => handlePriceSort('price')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Price{psi('price')}</th>
                             <th onClick={() => handlePriceSort('discount')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Discount{psi('discount')}</th>
                             <th onClick={() => handlePriceSort('recorded')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell">Recorded{psi('recorded')}</th>
-                            <th className="w-8 px-3 py-2" />
+                            <th className="px-3 py-2" />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">

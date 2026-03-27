@@ -86,16 +86,16 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 font-mono text-sm shadow-sm">
-      <div className="text-gray-400 text-xs mb-4 flex items-center justify-between">
+      <div className="text-yellow-600 text-xs mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="w-3 h-3 text-foreground" />
           <span className="font-semibold text-foreground">AI Discovery Agent</span>
-          {!isDone && <span className="text-gray-400">— running</span>}
+          {!isDone && <span className="text-yellow-600">— running</span>}
           {isDone && <span className="text-green-600">— complete</span>}
         </div>
         <div className="flex items-center gap-3">
           {!isDone && elapsedMs !== null && (
-            <span className="text-amber-500 tabular-nums text-xs">{formatElapsed(elapsedMs)}</span>
+            <span className="text-yellow-600 tabular-nums text-xs">{formatElapsed(elapsedMs)}</span>
           )}
           {isDone && totalTook !== null && (
             <span className="text-green-600 tabular-nums">finished in {formatDone(totalTook)}</span>
@@ -108,22 +108,21 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
           return (
             <div key={step.id} className="flex items-start gap-2.5">
               {step.status === 'running' && (
-                <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-100 border-t-amber-500 animate-spin mt-0.5 shrink-0" />
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-yellow-100 border-t-yellow-600 animate-spin mt-0.5 shrink-0" />
               )}
               {step.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />}
-              {step.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />}
-              {step.status === 'pending' && <Circle className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />}
+              {step.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />}
+              {step.status === 'pending' && <Circle className="w-3.5 h-3.5 text-yellow-300 mt-0.5 shrink-0" />}
               <div className="flex items-baseline gap-2 flex-wrap flex-1">
                 <span className={
-                  step.status === 'running' ? 'text-amber-500' :
                   step.status === 'done' ? 'text-green-700' :
-                  step.status === 'error' ? 'text-red-600' :
-                  'text-gray-400'
+                  step.status === 'error' ? 'text-red-400' :
+                  'text-yellow-600'
                 }>{step.text}</span>
-                {step.detail && <span className="text-gray-400 text-xs">{step.detail}</span>}
+                {step.detail && <span className={step.status === 'done' ? 'text-green-600 text-xs' : 'text-yellow-500 text-xs'}>{step.detail}</span>}
               </div>
               {tookMs !== null && (
-                <span className="text-gray-400 text-xs shrink-0 tabular-nums ml-2">{formatDone(tookMs)}</span>
+                <span className="text-green-500 text-xs shrink-0 tabular-nums ml-2">{formatDone(tookMs)}</span>
               )}
             </div>
           );
