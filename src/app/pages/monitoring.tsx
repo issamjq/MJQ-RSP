@@ -645,11 +645,11 @@ function PricesTab() {
                               />
                             </th>
                             <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10 whitespace-nowrap">#</th>
-                            <th onClick={() => handlePriceSort('store')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Store Name{psi('store')}</th>
-                            <th onClick={() => handlePriceSort('price')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none whitespace-nowrap w-36">Price{psi('price')}</th>
-                            <th onClick={() => handlePriceSort('discount')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell whitespace-nowrap w-28">Discount{psi('discount')}</th>
-                            <th onClick={() => handlePriceSort('recorded')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell whitespace-nowrap w-44">Recorded{psi('recorded')}</th>
-                            <th className="w-16 px-3 py-2" />
+                            <th onClick={() => handlePriceSort('store')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none w-[30%]">Store Name{psi('store')}</th>
+                            <th onClick={() => handlePriceSort('price')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none whitespace-nowrap w-[18%]">Price{psi('price')}</th>
+                            <th onClick={() => handlePriceSort('discount')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell whitespace-nowrap w-[14%]">Discount{psi('discount')}</th>
+                            <th onClick={() => handlePriceSort('recorded')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell whitespace-nowrap w-[20%]">Recorded{psi('recorded')}</th>
+                            <th className="w-[8%] px-3 py-2" />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
