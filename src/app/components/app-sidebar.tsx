@@ -72,16 +72,16 @@ export function AppSidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-white border-b border-gray-200 flex items-center gap-3 px-4">
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-gray-100">
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-black rounded-lg flex items-center justify-center">
             <div className="w-2 h-2 bg-white rounded-sm rotate-45" />
           </div>
           <span className="font-semibold text-[15px]">MJQ APP</span>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-gray-100">
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
       </div>
 
       {/* Mobile drawer */}
@@ -101,26 +101,43 @@ export function AppSidebar() {
               </button>
             </div>
             <nav className="flex-1 px-3 py-4 overflow-y-auto">
-              <ul className="space-y-1">
-                {NAV_ITEMS.map(item => (
-                  <li key={item.label}>
-                    <Link
-                      to={item.path}
-                      className={'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ' +
-                        (isActive(item.path) ? 'bg-accent/60 text-foreground font-medium' : 'text-muted-foreground hover:bg-accent/30 hover:text-foreground')}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+              {/* Dashboard — standalone */}
+              <ul className="space-y-0.5 mb-4">
+                <li>
+                  <Link to="/overview" className={'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ' + (isActive('/overview') ? 'bg-accent/60 text-foreground font-medium' : 'text-muted-foreground hover:bg-accent/30 hover:text-foreground')}>
+                    <Home className="w-4 h-4" /><span>Dashboard</span>
+                  </Link>
+                </li>
               </ul>
+              {/* Grouped sections */}
+              {SECTIONS.map(section => (
+                <div key={section.key} className="mb-4">
+                  <button
+                    onClick={() => toggleSection(section.key)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors rounded-lg hover:bg-accent/20"
+                  >
+                    <span>{section.label}</span>
+                    <ChevronDown className={'w-3 h-3 ml-auto transition-transform ' + (openSections[section.key] ? 'rotate-180' : '')} />
+                  </button>
+                  {openSections[section.key] && (
+                    <ul className="mt-1 space-y-0.5">
+                      {section.items.map(item => (
+                        <li key={item.path}>
+                          <Link to={item.path} className={'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ' + (isActive(item.path) ? 'bg-accent/60 text-foreground font-medium' : 'text-muted-foreground hover:bg-accent/30 hover:text-foreground')}>
+                            <item.icon className="w-4 h-4" /><span>{item.label}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
             </nav>
             <div className="p-4 border-t border-gray-100 space-y-1">
               <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/30">
                 <LogOut className="w-4 h-4" /><span>Log out</span>
               </button>
-              <p className="text-[10px] text-muted-foreground px-3">v1.0.8</p>
+              <p className="text-[10px] text-muted-foreground px-3">v1.0.9</p>
             </div>
           </div>
         </>
@@ -212,7 +229,7 @@ export function AppSidebar() {
                 <LogOut className="w-3.5 h-3.5" /><span>Log out</span>
               </button>
               <div className="px-3 py-1">
-                <span className="text-[10px] text-muted-foreground">v1.0.8</span>
+                <span className="text-[10px] text-muted-foreground">v1.0.9</span>
               </div>
             </div>
           </div>
