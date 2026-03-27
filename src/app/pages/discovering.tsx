@@ -524,7 +524,10 @@ export function Discovering() {
                       {/* Price */}
                       <div className="shrink-0 text-right self-center">
                         {isTracked ? (
-                          <span className="text-xs text-green-600 font-medium">Already tracked</span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-xs text-green-600 font-medium">Already tracked</span>
+                            {m.found.price != null && <PriceBadge loading={false} price={m.found.price} />}
+                          </div>
                         ) : !m.match ? (
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : priceState !== undefined ? (
