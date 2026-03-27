@@ -19,14 +19,23 @@ router.get('/me', async (req, res, next) => {
   try {
     const email = req.firebaseUser?.email;
     if (!email) return next(createError('No email in token', 401, 'UNAUTHENTICATED'));
+
     const user = await getCallerUser(email);
-    if (!user) {
-      return res.status(403).json({
-        success: false,
-        error: { message: 'Access denied. Your account is not authorised to use this application.', code: 'FORBIDDEN' },
+    if (user) return res.json({ success: true, data: user });
+
+    // Bootstrap mode: if the table is empty, let the first user in as Super Admin
+    const { rows: countRows } = await db.query('SELECT COUNT(*) FROM allowed_users');
+    if (parseInt(countRows[0].count, 10) === 0) {
+      return res.json({
+        success: true,
+        data: { id: 0, email, name: email, role: '003', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       });
     }
-    res.json({ success: true, data: user });
+
+    return res.status(403).json({
+      success: false,
+      error: { message: 'Access denied. Your account is not authorised to use this application.', code: 'FORBIDDEN' },
+    });
   } catch (err) { next(err); }
 });
 
