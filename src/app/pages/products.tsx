@@ -257,7 +257,7 @@ export function Products() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{product.internal_name}</p>
+                      <p className="text-sm font-medium break-words">{product.internal_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {product.brand && <p className="text-xs text-muted-foreground">{product.brand}</p>}
                         {product.initial_rsp != null && <p className="text-xs font-medium text-gray-700">AED {Number(product.initial_rsp).toFixed(2)}</p>}
@@ -286,16 +286,16 @@ export function Products() {
                   <tbody className="divide-y divide-gray-100">
                     {sortedProducts.map((product) => (
                       <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                        <td className="px-6 py-4 max-w-xs">
+                          <div className="flex items-start gap-3">
                             {product.image_url ? (
-                              <img src={product.image_url} alt={product.internal_name} className="w-10 h-10 rounded-lg object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={product.image_url} alt={product.internal_name} className="w-10 h-10 rounded-lg object-cover shrink-0 mt-0.5" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
-                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
                                 <Package className="w-5 h-5 text-gray-400" />
                               </div>
                             )}
-                            <span className="font-medium text-sm min-w-0 truncate">{product.internal_name}</span>
+                            <span className="font-medium text-sm break-words">{product.internal_name}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
