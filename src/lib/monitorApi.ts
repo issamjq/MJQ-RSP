@@ -109,7 +109,7 @@ export const companiesApi = {
       include_inactive: includeInactive ? "true" : undefined,
     }),
   get: (id: number) => api.get<ApiResponse<Company>>(`/api/companies/${id}`),
-  create: (body: { name: string; slug: string; base_url?: string }) =>
+  create: (body: { name: string; slug: string; base_url?: string; logo_url?: string }) =>
     api.post<ApiResponse<Company>>("/api/companies", body),
   update: (id: number, body: Partial<Company>) =>
     api.put<ApiResponse<Company>>(`/api/companies/${id}`, body),

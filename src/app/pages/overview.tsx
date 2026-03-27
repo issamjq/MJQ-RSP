@@ -110,7 +110,7 @@ export function Overview() {
   ];
 
   const quickItems = [
-    { title: 'Live Price Feed', description: 'Live prices — one snapshot per product per store', icon: TrendingUp, path: '/price-board' },
+    { title: 'Price Activity', description: 'Live prices — one snapshot per product per store', icon: TrendingUp, path: '/price-board' },
     { title: 'Tracked Listings', description: 'Manage the store URLs being monitored', icon: LinkIcon, path: '/tracked-urls' },
     { title: 'Products', description: 'Reference catalog — your internal product list', icon: Package, path: '/products' },
     { title: 'Stores', description: 'Monitored marketplaces & scraper config', icon: Building2, path: '/companies' },

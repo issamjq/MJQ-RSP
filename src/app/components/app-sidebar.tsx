@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 const NAV_ITEMS = [
   { icon: Home, label: 'Dashboard', path: '/overview' },
   { icon: Compass, label: 'Market Discovery', path: '/discovering' },
-  { icon: TrendingUp, label: 'Live Price Feed', path: '/price-board' },
+  { icon: TrendingUp, label: 'Price Activity', path: '/price-board' },
   { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
   { icon: Package, label: 'Products', path: '/products' },
   { icon: Building2, label: 'Stores', path: '/companies' },
@@ -26,7 +26,7 @@ const SECTIONS = [
     key: 'monitoring',
     label: 'Monitoring',
     items: [
-      { icon: TrendingUp, label: 'Live Price Feed', path: '/price-board' },
+      { icon: TrendingUp, label: 'Price Activity', path: '/price-board' },
       { icon: LinkIcon, label: 'Tracked Listings', path: '/tracked-urls' },
     ],
   },

@@ -1,5 +1,5 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer, ChevronRight } from 'lucide-react';
+import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer, ChevronRight, ExternalLink } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
@@ -337,22 +337,21 @@ const DATE_FILTERS: { key: DateFilterKey; label: string }[] = [
 function printSelected(snapshots: PriceSnapshot[]) {
   const w = window.open('', '_blank');
   if (!w) return;
-  const date = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const date = new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const rows = snapshots.map((s, i) => {
-    const origCell = s.original_price != null && s.original_price !== s.price
-      ? `<td style="text-decoration:line-through;color:#999">${s.currency ?? ''} ${Number(s.original_price).toFixed(2)}</td>`
+    const priceCell = s.price != null
+      ? `<td style="font-weight:600">${s.currency ?? ''} ${Number(s.price).toFixed(2)}${s.original_price != null && s.original_price !== s.price ? `<br><span style="text-decoration:line-through;color:#999;font-weight:400;font-size:10px">${s.currency ?? ''} ${Number(s.original_price).toFixed(2)}</span>` : ''}</td>`
       : '<td style="color:#999">—</td>';
     return `<tr>
       <td>${i + 1}</td>
       <td>${s.internal_name ?? '—'}</td>
       <td>${s.company_name ?? '—'}</td>
-      <td style="font-weight:600">${s.price != null ? `${s.currency ?? ''} ${Number(s.price).toFixed(2)}` : '—'}</td>
-      ${origCell}
+      ${priceCell}
       <td>${formatDateTime(s.checked_at)}</td>
     </tr>`;
   }).join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Live Price Feed — ${date}</title>
+    <title>Price Activity — ${date}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#111;padding:24px}
@@ -367,11 +366,11 @@ function printSelected(snapshots: PriceSnapshot[]) {
       tr:nth-child(even){background:#fafafa}
       @media print{@page{margin:15mm;size:A4 landscape}body{padding:0}}
     </style></head><body>
-    <header><div><h1>Live Price Feed</h1></div>
+    <header><div><h1>Price Activity</h1></div>
       <div class="meta"><div>${snapshots.length} item${snapshots.length !== 1 ? 's' : ''}</div><div>Exported ${date}</div></div>
     </header>
     <table>
-      <thead><tr><th>#</th><th>Product</th><th>Store</th><th>Price</th><th>Original</th><th>Checked</th></tr></thead>
+      <thead><tr><th>#</th><th>Product</th><th>Store Name</th><th>Price</th><th>Recorded</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></body></html>`);
   w.document.close();
@@ -389,6 +388,17 @@ function PricesTab() {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [storeList, setStoreList] = useState<Company[]>([]);
+  const [productList, setProductList] = useState<Product[]>([]);
+
+  const storeMap = useMemo(() => new Map(storeList.map(c => [c.id, c])), [storeList]);
+  const productMap = useMemo(() => new Map(productList.map(p => [p.id, p])), [productList]);
+
+  useEffect(() => {
+    Promise.all([companiesApi.list(), productsApi.list({ limit: 500 })])
+      .then(([cRes, pRes]) => { setStoreList(cRes.data); setProductList(pRes.data); })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -571,6 +581,12 @@ function PricesTab() {
                     onClick={() => toggleGroup(productName)}
                   >
                     <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isCollapsed ? '' : 'rotate-90'}`} />
+                    {(() => {
+                      const img = productMap.get(items[0]?.product_id)?.image_url;
+                      return img ? (
+                        <img src={img} alt="" className="w-7 h-7 rounded-md object-contain bg-white border border-gray-200 p-0.5 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      ) : null;
+                    })()}
                     <span className="font-semibold text-sm flex-1 truncate">{productName}</span>
                     <span className="text-xs text-muted-foreground shrink-0">{items.length} store{items.length !== 1 ? 's' : ''}</span>
                     {minP !== null && (
@@ -601,10 +617,9 @@ function PricesTab() {
                               />
                             </th>
                             <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10">#</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Store</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Store Name</th>
                             <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Price</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Original</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Checked</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Recorded</th>
                             <th className="w-8 px-3 py-2" />
                           </tr>
                         </thead>
@@ -620,27 +635,37 @@ function PricesTab() {
                                 <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums">{idx}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center gap-2">
-                                    {snap.image_url && (
-                                      <img src={snap.image_url} alt="" className="w-8 h-8 rounded-lg object-cover bg-gray-100 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                                    )}
+                                    {(() => {
+                                      const logo = storeMap.get(snap.company_id)?.logo_url;
+                                      return logo ? (
+                                        <img src={logo} alt="" className="w-7 h-7 rounded-md object-contain bg-gray-50 border border-gray-200 p-0.5 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                      ) : null;
+                                    })()}
                                     <span className="text-sm font-medium">{snap.company_name}</span>
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5">
-                                  <span className="text-sm font-semibold">
-                                    {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2.5 hidden md:table-cell">
-                                  {snap.original_price != null && snap.original_price !== snap.price
-                                    ? <span className="text-sm text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</span>
-                                    : <span className="text-sm text-muted-foreground">—</span>}
+                                  <div>
+                                    <span className="text-sm font-semibold">
+                                      {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
+                                    </span>
+                                    {snap.original_price != null && snap.original_price !== snap.price && (
+                                      <div className="text-xs text-muted-foreground line-through leading-tight">{snap.currency} {Number(snap.original_price).toFixed(2)}</div>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">{formatDateTime(snap.checked_at)}</td>
                                 <td className="px-3 py-2.5">
-                                  <button onClick={() => handleDelete(snap.id)} className="p-1 hover:bg-red-50 rounded opacity-30 hover:opacity-100 transition-all">
-                                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    {snap.product_url && (
+                                      <a href={snap.product_url} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-blue-50 rounded opacity-30 hover:opacity-100 transition-all" title="Open product page">
+                                        <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
+                                      </a>
+                                    )}
+                                    <button onClick={() => handleDelete(snap.id)} className="p-1 hover:bg-red-50 rounded opacity-30 hover:opacity-100 transition-all">
+                                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -664,18 +689,38 @@ function PricesTab() {
               <button onClick={() => handleDelete(snap.id)} className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 rounded text-red-500">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-              {snap.image_url && (
-                <img src={snap.image_url} alt={snap.internal_name} className="w-16 h-16 object-cover rounded-lg mb-3" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              )}
+              {(() => {
+                const img = productMap.get(snap.product_id)?.image_url;
+                return img ? (
+                  <img src={img} alt={snap.internal_name} className="w-16 h-16 object-contain rounded-lg mb-3 bg-gray-50 border border-gray-100 p-1" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : null;
+              })()}
               <p className="text-sm font-medium line-clamp-2 mb-1">{snap.internal_name}</p>
-              <p className="text-xs text-muted-foreground mb-2">{snap.company_name}</p>
-              {snap.price != null
-                ? <p className="text-lg font-semibold">{snap.currency} {Number(snap.price).toFixed(2)}</p>
-                : <p className="text-sm text-muted-foreground">No price</p>}
-              {snap.original_price != null && snap.original_price !== snap.price && (
-                <p className="text-xs text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-2">{formatDateTime(snap.checked_at)}</p>
+              <div className="flex items-center gap-1.5 mb-2">
+                {(() => {
+                  const logo = storeMap.get(snap.company_id)?.logo_url;
+                  return logo ? (
+                    <img src={logo} alt="" className="w-4 h-4 rounded object-contain bg-gray-50 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : null;
+                })()}
+                <p className="text-xs text-muted-foreground">{snap.company_name}</p>
+              </div>
+              <div className="flex items-baseline gap-2 flex-wrap">
+                {snap.price != null
+                  ? <p className="text-lg font-semibold">{snap.currency} {Number(snap.price).toFixed(2)}</p>
+                  : <p className="text-sm text-muted-foreground">No price</p>}
+                {snap.original_price != null && snap.original_price !== snap.price && (
+                  <p className="text-xs text-muted-foreground line-through">{snap.currency} {Number(snap.original_price).toFixed(2)}</p>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-muted-foreground">{formatDateTime(snap.checked_at)}</p>
+                {snap.product_url && (
+                  <a href={snap.product_url} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-blue-50 rounded transition-colors" title="Open product page">
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                  </a>
+                )}
+              </div>
             </div>
           ))}
           {filtered.length === 0 && <div className="col-span-full py-12 text-center text-sm text-muted-foreground">No price data for the selected period.</div>}
@@ -693,8 +738,8 @@ export function PriceBoard() {
       <div className="flex-1 overflow-auto bg-gradient-to-br from-amber-50/30 via-white to-amber-50/20 pt-14 md:pt-0">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-semibold mb-1">Live Price Feed</h1>
-            <p className="text-sm text-muted-foreground">Live price snapshots across all tracked products and stores</p>
+            <h1 className="text-2xl font-semibold mb-1">Price Activity</h1>
+            <p className="text-sm text-muted-foreground">Price snapshots across all tracked products and stores</p>
           </div>
           <PricesTab />
         </div>

@@ -1,6 +1,6 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Skeleton } from '../components/ui/skeleton';
-import { Building2, RefreshCw, Plus, Play, Edit, Trash2, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Building2, RefreshCw, Plus, Edit, Trash2, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { companiesApi } from '../../lib/monitorApi';
 import type { Company } from '../../lib/monitorApi';
@@ -12,7 +12,7 @@ export function Companies() {
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Company | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', slug: '', base_url: '', is_active: true });
+  const [form, setForm] = useState({ name: '', slug: '', base_url: '', logo_url: '', is_active: true });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -30,13 +30,13 @@ export function Companies() {
 
   const openAdd = () => {
     setEditTarget(null);
-    setForm({ name: '', slug: '', base_url: '', is_active: true });
+    setForm({ name: '', slug: '', base_url: '', logo_url: '', is_active: true });
     setShowModal(true);
   };
 
   const openEdit = (c: Company) => {
     setEditTarget(c);
-    setForm({ name: c.name, slug: c.slug, base_url: c.base_url || '', is_active: c.is_active });
+    setForm({ name: c.name, slug: c.slug, base_url: c.base_url || '', logo_url: c.logo_url || '', is_active: c.is_active });
     setShowModal(true);
   };
 
@@ -46,10 +46,10 @@ export function Companies() {
     setSaving(true);
     try {
       if (editTarget) {
-        await companiesApi.update(editTarget.id, { name: form.name, slug: form.slug, base_url: form.base_url || undefined, is_active: form.is_active });
+        await companiesApi.update(editTarget.id, { name: form.name, slug: form.slug, base_url: form.base_url || undefined, logo_url: form.logo_url || undefined, is_active: form.is_active });
         toast.success('Company updated');
       } else {
-        await companiesApi.create({ name: form.name, slug: form.slug, base_url: form.base_url || undefined });
+        await companiesApi.create({ name: form.name, slug: form.slug, base_url: form.base_url || undefined, logo_url: form.logo_url || undefined });
         toast.success('Company added');
       }
       setShowModal(false);
@@ -123,7 +123,16 @@ export function Companies() {
                   <tbody className="divide-y divide-gray-100">
                     {companies.map((company) => (
                       <tr key={company.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4"><span className="text-sm font-medium">{company.name}</span></td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {company.logo_url ? (
+                              <img src={company.logo_url} alt={company.name} className="w-8 h-8 rounded-lg object-contain bg-gray-100 p-1 border border-gray-100 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center"><Building2 className="w-4 h-4 text-gray-400" /></div>
+                            )}
+                            <span className="text-sm font-medium">{company.name}</span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 hidden sm:table-cell"><span className="text-sm text-muted-foreground font-mono">{company.slug}</span></td>
                         <td className="px-6 py-4 hidden md:table-cell">
                           {company.base_url ? (
@@ -179,6 +188,15 @@ export function Companies() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
                   <input type="url" value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))} placeholder="https://www.example.com" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL</label>
+                  <div className="flex items-center gap-3">
+                    {form.logo_url && (
+                      <img src={form.logo_url} alt="logo preview" className="w-10 h-10 rounded-lg object-contain bg-gray-100 border border-gray-200 p-1 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    )}
+                    <input type="url" value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://example.com/logo.png" className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
