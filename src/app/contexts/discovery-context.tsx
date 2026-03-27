@@ -57,16 +57,34 @@ interface DiscoveryContextValue {
 const DiscoveryContext = createContext<DiscoveryContextValue | null>(null);
 
 // ── Provider ──────────────────────────────────────────────────────
+const SESSION_KEY = 'rsp_discovery_state';
+
+function loadSession() {
+  try { const r = sessionStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveSession(data: object) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
+}
+
 export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [phase, setPhase] = useState<Phase>('search');
-  const [query, setQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [logSteps, setLogSteps] = useState<LogStep[]>([]);
-  const [discoverStartedAt, setDiscoverStartedAt] = useState<number>(0);
-  const [results, setResults] = useState<DiscoveryGroup[]>([]);
-  const [prices, setPrices] = useState<Record<string, PriceSnapshot | null | 'loading'>>({});
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const _saved = loadSession();
+  // If refresh happened mid-scan, reset to search. Otherwise restore.
+  const _wasScanning = _saved?.phase === 'processing';
+  const [phase, setPhase] = useState<Phase>(_wasScanning ? 'search' : (_saved?.phase ?? 'search'));
+  const [query, setQuery] = useState<string>(_saved?.query ?? '');
+  const [selectedIds, setSelectedIds] = useState<number[]>(_saved?.selectedIds ?? []);
+  const [logSteps, setLogSteps] = useState<LogStep[]>(_wasScanning ? [] : (_saved?.logSteps ?? []));
+  const [discoverStartedAt, setDiscoverStartedAt] = useState<number>(_saved?.discoverStartedAt ?? 0);
+  const [results, setResults] = useState<DiscoveryGroup[]>(_wasScanning ? [] : (_saved?.results ?? []));
+  const [prices, setPrices] = useState<Record<string, PriceSnapshot | null | 'loading'>>(_wasScanning ? {} : (_saved?.prices ?? {}));
+  const [selected, setSelected] = useState<Set<string>>(new Set(_wasScanning ? [] : (_saved?.selected ?? [])));
+
+  // Persist state to sessionStorage whenever it changes
+  useEffect(() => {
+    saveSession({ phase, query, selectedIds, logSteps, discoverStartedAt, results, prices, selected: [...selected] });
+  }, [phase, query, selectedIds, logSteps, discoverStartedAt, results, prices, selected]);
 
   useEffect(() => {
     companiesApi.list().then(r => setCompanies(r.data)).catch(() => {});
@@ -279,6 +297,7 @@ export function DiscoveryProvider({ children }: { children: React.ReactNode }) {
   }, [results, selected, addLog, updateLog]);
 
   const handleNewSearch = useCallback(() => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
     setPhase('search');
     setResults([]);
     setPrices({});
