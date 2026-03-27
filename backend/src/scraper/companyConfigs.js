@@ -117,10 +117,12 @@ const configs = {
       '.stock.unavailable span',
       '[class*="availability"]',
     ],
-    waitForSelector: 'h1.page-title',
-    pageOptions: { waitUntil: 'domcontentloaded' },
+    // Spinneys is a JS-rendered site — price loads after hydration, not at domcontentloaded.
+    // Wait for the price element itself before extracting.
+    waitForSelector: '.wee-price, .price-box .price, [data-price-amount]',
+    pageOptions: { waitUntil: 'networkidle' },
     currency: 'AED',
-    blockResources: ['image', 'font', 'media'],
+    blockResources: ['font', 'media'],  // keep images so networkidle settles correctly
     // Spinneys uses a custom "Ð" currency symbol rendered via a special font.
     // Claude Vision (Haiku) misreads it as a digit, corrupting the first digit of the price.
     // Force selector-first so [data-price-amount] is read directly from the DOM attribute.
