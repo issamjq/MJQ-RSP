@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
 import type { ProductCompanyUrl, PriceSnapshot, Company, Product } from '../../lib/monitorApi';
 import { toast } from 'sonner';
+import { MultiSelect } from '../components/multi-select';
 
 function formatRelTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -16,77 +17,6 @@ function formatRelTime(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-
-// ---- MultiSelect dropdown ----
-function MultiSelect({ label, options, selected, onChange }: {
-  label: string;
-  options: { value: string; label: string }[];
-  selected: Set<string>;
-  onChange: (s: Set<string>) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const toggle = (v: string) => {
-    const n = new Set(selected);
-    n.has(v) ? n.delete(v) : n.add(v);
-    onChange(n);
-  };
-  const count = selected.size;
-  const btnLabel = count === 0 ? `All ${label}` : `${label}: ${count}`;
-  const visible = search.trim()
-    ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
-    : options;
-  return (
-    <div className="relative">
-      <button
-        onClick={() => { setOpen(o => !o); setSearch(''); }}
-        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg bg-white transition-colors ${count > 0 ? 'border-black text-black font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-      >
-        {btnLabel}
-        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 min-w-[220px] bg-white border border-gray-200 rounded-xl shadow-lg py-1">
-            {/* Search input */}
-            <div className="px-2 pt-1.5 pb-1 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-                <input
-                  autoFocus
-                  type="text"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder={`Search ${label.toLowerCase()}…`}
-                  className="w-full pl-6 pr-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-black/10"
-                />
-              </div>
-            </div>
-            {/* All / None */}
-            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100">
-              <button onClick={() => onChange(new Set(options.map(o => o.value)))} className="text-xs text-blue-600 hover:underline">All</button>
-              <span className="text-gray-300">·</span>
-              <button onClick={() => onChange(new Set())} className="text-xs text-gray-500 hover:underline">None</button>
-            </div>
-            {/* Options */}
-            <div className="max-h-52 overflow-y-auto">
-              {visible.length === 0
-                ? <p className="px-3 py-2 text-xs text-muted-foreground">No results</p>
-                : visible.map(o => (
-                  <label key={o.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={selected.has(o.value)} onChange={() => toggle(o.value)} className="w-3.5 h-3.5 accent-black rounded" />
-                    <span className="text-sm text-gray-700 truncate max-w-[180px]">{o.label}</span>
-                  </label>
-                ))
-              }
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ---- Product URLs Tab ----
 function ProductUrlsTab() {
@@ -102,6 +32,9 @@ function ProductUrlsTab() {
   const [progressRunId, setProgressRunId] = useState<number | null>(null);
   const [progress, setProgress] = useState<{ total: number; done: number; success: number; fail: number } | null>(null);
   const [form, setForm] = useState({ product_id: '', company_id: '', product_url: '', currency: 'AED' });
+  const [urlSearch, setUrlSearch] = useState('');
+  const [urlFilterStores, setUrlFilterStores] = useState<Set<string>>(new Set());
+  const [urlFilterProducts, setUrlFilterProducts] = useState<Set<string>>(new Set());
   const [urlSortKey, setUrlSortKey] = useState<'product' | 'company' | 'last_check' | 'status'>('product');
   const [urlSortDir, setUrlSortDir] = useState<'asc' | 'desc'>('asc');
   const handleUrlSort = (key: typeof urlSortKey) => {
@@ -109,14 +42,24 @@ function ProductUrlsTab() {
     else { setUrlSortKey(key); setUrlSortDir('asc'); }
   };
   const usi = (key: string) => urlSortKey === key ? (urlSortDir === 'asc' ? ' ↑' : ' ↓') : '';
-  const sortedUrls = useMemo(() => [...urls].sort((a, b) => {
+  const filteredUrls = useMemo(() => {
+    let result = urls;
+    if (urlSearch.trim()) {
+      const q = urlSearch.toLowerCase();
+      result = result.filter(u => u.internal_name.toLowerCase().includes(q) || u.company_name.toLowerCase().includes(q) || u.product_url.toLowerCase().includes(q));
+    }
+    if (urlFilterStores.size > 0) result = result.filter(u => urlFilterStores.has(String(u.company_id)));
+    if (urlFilterProducts.size > 0) result = result.filter(u => urlFilterProducts.has(String(u.product_id)));
+    return result;
+  }, [urls, urlSearch, urlFilterStores, urlFilterProducts]);
+  const sortedUrls = useMemo(() => [...filteredUrls].sort((a, b) => {
     const d = urlSortDir === 'asc' ? 1 : -1;
     if (urlSortKey === 'product') return a.internal_name.localeCompare(b.internal_name) * d;
     if (urlSortKey === 'company') return a.company_name.localeCompare(b.company_name) * d;
     if (urlSortKey === 'last_check') return ((a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0) - (b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0)) * d;
     if (urlSortKey === 'status') return (a.last_status ?? '').localeCompare(b.last_status ?? '') * d;
     return 0;
-  }), [urls, urlSortKey, urlSortDir]);
+  }), [filteredUrls, urlSortKey, urlSortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,7 +103,7 @@ function ProductUrlsTab() {
   };
 
   const toggleAll = () => {
-    setSelected(prev => prev.size === urls.length ? new Set() : new Set(urls.map(u => u.id)));
+    setSelected(prev => prev.size === filteredUrls.length ? new Set() : new Set(filteredUrls.map(u => u.id)));
   };
 
   const handleScrapeSelected = async () => {
@@ -235,8 +178,42 @@ function ProductUrlsTab() {
         </div>
       )}
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={urlSearch}
+            onChange={e => setUrlSearch(e.target.value)}
+            placeholder="Search product, store, URL…"
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5"
+          />
+        </div>
+        <MultiSelect
+          label="Stores"
+          options={companies.map(c => ({ value: String(c.id), label: c.name }))}
+          selected={urlFilterStores}
+          onChange={setUrlFilterStores}
+        />
+        <MultiSelect
+          label="Products"
+          options={products.map(p => ({ value: String(p.id), label: p.internal_name }))}
+          selected={urlFilterProducts}
+          onChange={setUrlFilterProducts}
+        />
+        {(urlSearch || urlFilterStores.size > 0 || urlFilterProducts.size > 0) && (
+          <button
+            onClick={() => { setUrlSearch(''); setUrlFilterStores(new Set()); setUrlFilterProducts(new Set()); }}
+            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <p className="text-sm text-muted-foreground">{urls.length} tracked URLs</p>
+        <p className="text-sm text-muted-foreground">{filteredUrls.length !== urls.length ? `${filteredUrls.length} of ${urls.length}` : urls.length} tracked URLs</p>
         <div className="flex items-center gap-2 flex-wrap">
           {selected.size > 0 && (
             <button onClick={handleScrapeSelected} disabled={scraping} className="flex items-center gap-2 px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-60">
@@ -277,7 +254,7 @@ function ProductUrlsTab() {
               <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
                   <th className="px-4 py-3 w-10">
-                    <input type="checkbox" checked={selected.size === urls.length && urls.length > 0} ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < urls.length; }} onChange={toggleAll} className="rounded" />
+                    <input type="checkbox" checked={selected.size === filteredUrls.length && filteredUrls.length > 0} ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < filteredUrls.length; }} onChange={toggleAll} className="rounded" />
                   </th>
                   <th onClick={() => handleUrlSort('product')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Product{usi('product')}</th>
                   <th onClick={() => handleUrlSort('company')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Company{usi('company')}</th>

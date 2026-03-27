@@ -1,6 +1,6 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Skeleton } from '../components/ui/skeleton';
-import { Building2, RefreshCw, Plus, Edit, Trash2, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Building2, RefreshCw, Plus, Edit, Trash2, CheckCircle2, X, Loader2, Search } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { companiesApi } from '../../lib/monitorApi';
 import type { Company } from '../../lib/monitorApi';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 export function Companies() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<'name' | 'slug' | 'status'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -18,13 +19,17 @@ export function Companies() {
   };
   const si = (key: string) => sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
-  const sortedCompanies = useMemo(() => [...companies].sort((a, b) => {
-    const d = sortDir === 'asc' ? 1 : -1;
-    if (sortKey === 'name') return a.name.localeCompare(b.name) * d;
-    if (sortKey === 'slug') return a.slug.localeCompare(b.slug) * d;
-    if (sortKey === 'status') return (Number(b.is_active) - Number(a.is_active)) * d;
-    return 0;
-  }), [companies, sortKey, sortDir]);
+  const sortedCompanies = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q ? companies.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)) : companies;
+    return [...filtered].sort((a, b) => {
+      const d = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'name') return a.name.localeCompare(b.name) * d;
+      if (sortKey === 'slug') return a.slug.localeCompare(b.slug) * d;
+      if (sortKey === 'status') return (Number(b.is_active) - Number(a.is_active)) * d;
+      return 0;
+    });
+  }, [companies, sortKey, sortDir, search]);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Company | null>(null);
   const [saving, setSaving] = useState(false);
@@ -107,6 +112,11 @@ export function Companies() {
                 Add
               </button>
             </div>
+          </div>
+
+          <div className="relative mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input type="text" placeholder="Search name or slug…" value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
           </div>
 
           {loading ? (

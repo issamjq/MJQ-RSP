@@ -1,6 +1,7 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Skeleton } from '../components/ui/skeleton';
 import { Package, Search, Grid3x3, List, RefreshCw, Download, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
+import { MultiSelect } from '../components/multi-select';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { productsApi } from '../../lib/monitorApi';
 import type { Product } from '../../lib/monitorApi';
@@ -26,6 +27,7 @@ function parseCsv(text: string): Array<Record<string, string>> {
 export function Products() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [search, setSearch] = useState('');
+  const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<Product[]>([]);
   const [sortKey, setSortKey] = useState<'name' | 'brand' | 'sku'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -36,13 +38,16 @@ export function Products() {
   };
   const si = (key: string) => sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
-  const sortedProducts = useMemo(() => [...products].sort((a, b) => {
-    const d = sortDir === 'asc' ? 1 : -1;
-    if (sortKey === 'name') return a.internal_name.localeCompare(b.internal_name) * d;
-    if (sortKey === 'brand') return (a.brand ?? '').localeCompare(b.brand ?? '') * d;
-    if (sortKey === 'sku') return (a.internal_sku ?? '').localeCompare(b.internal_sku ?? '') * d;
-    return 0;
-  }), [products, sortKey, sortDir]);
+  const sortedProducts = useMemo(() => {
+    const filtered = filterBrands.size > 0 ? products.filter(p => filterBrands.has(p.brand ?? '')) : products;
+    return [...filtered].sort((a, b) => {
+      const d = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'name') return a.internal_name.localeCompare(b.internal_name) * d;
+      if (sortKey === 'brand') return (a.brand ?? '').localeCompare(b.brand ?? '') * d;
+      if (sortKey === 'sku') return (a.internal_sku ?? '').localeCompare(b.internal_sku ?? '') * d;
+      return 0;
+    });
+  }, [products, sortKey, sortDir, filterBrands]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -189,9 +194,22 @@ export function Products() {
             </div>
           </div>
 
-          <div className="relative mb-6">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Search name, SKU, barcode, brand..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
+          <div className="flex items-center gap-2 mb-6 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" placeholder="Search name, SKU, barcode, brand..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-sm" />
+            </div>
+            {(() => {
+              const brands = [...new Set(products.map(p => p.brand ?? '').filter(Boolean))].sort();
+              return brands.length > 0 ? (
+                <MultiSelect
+                  label="Brand"
+                  options={brands.map(b => ({ value: b, label: b }))}
+                  selected={filterBrands}
+                  onChange={setFilterBrands}
+                />
+              ) : null;
+            })()}
           </div>
 
           {loading ? (
