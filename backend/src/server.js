@@ -12,6 +12,8 @@ async function runMigrations() {
   const migrations = [
     // Add original_price column for discount tracking
     `ALTER TABLE price_snapshots ADD COLUMN IF NOT EXISTS original_price NUMERIC(12,2)`,
+    // Add initial_rsp to products
+    `ALTER TABLE products ADD COLUMN IF NOT EXISTS initial_rsp NUMERIC(10,2)`,
   ];
   for (const sql of migrations) {
     try {
