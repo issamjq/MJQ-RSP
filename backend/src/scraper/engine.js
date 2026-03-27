@@ -163,7 +163,9 @@ class ScraperEngine {
       // ── Extract fields ────────────────────────────────────────────────────
       let rawTitleText, rawPriceText, rawAvailabilityText, price, originalPrice, detectedCurrency, availability;
 
-      if (aiApiKey) {
+      const preferSelectors = selectors.preferSelectors || false;
+
+      if (aiApiKey && !preferSelectors) {
         // ── AI Vision path: Claude looks at screenshot, extracts everything ──
         logger.info('[Scraper] Using Claude Vision for extraction', { url });
         const aiResult = await extractWithVision(page, currency, aiApiKey).catch((err) => {
@@ -191,7 +193,8 @@ class ScraperEngine {
           availability        = parseAvailability(rawAvailabilityText);
         }
       } else {
-        // ── Selector path (no API key) ─────────────────────────────────────
+        // ── Selector path (no API key, or preferSelectors flag set) ───────
+        if (preferSelectors) logger.info('[Scraper] Using selectors (preferSelectors=true)', { url });
         rawTitleText        = await this._extractFirst(page, titleSelectors);
         rawPriceText        = await this._extractFirst(page, priceSelectors);
         rawAvailabilityText = await this._extractFirst(page, availabilitySelectors);
@@ -200,6 +203,21 @@ class ScraperEngine {
         originalPrice       = null;
         detectedCurrency    = parsed.currency;
         availability        = parseAvailability(rawAvailabilityText);
+
+        // If selectors got nothing and AI is available, try Vision as fallback
+        if (price === null && aiApiKey) {
+          logger.info('[Scraper] Selectors found no price, trying Claude Vision fallback', { url });
+          const aiResult = await extractWithVision(page, currency, aiApiKey).catch(() => null);
+          if (aiResult && aiResult.price !== null) {
+            rawPriceText        = aiResult.rawPriceText;
+            rawTitleText        = aiResult.rawTitleText        || rawTitleText;
+            rawAvailabilityText = aiResult.rawAvailabilityText || rawAvailabilityText;
+            price               = aiResult.price;
+            originalPrice       = aiResult.originalPrice ?? null;
+            detectedCurrency    = aiResult.currency;
+            availability        = aiResult.availability        || availability;
+          }
+        }
       }
 
       // ── Extract image URL (always from page HTML, AI can't return URLs) ──

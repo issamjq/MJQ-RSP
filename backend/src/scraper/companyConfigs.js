@@ -97,9 +97,10 @@ const configs = {
 
   'spinneys': {
     priceSelectors: [
+      // data-price-amount is a Magento attribute with the raw numeric value — exact, no OCR needed
+      '[data-price-amount]',
       '.price-box .price',
       '.regular-price .price',
-      '[data-price-amount]',
       '.product-info-price .price',
       '.product-info-price .wee-price',
     ],
@@ -118,6 +119,10 @@ const configs = {
     pageOptions: { waitUntil: 'domcontentloaded' },
     currency: 'AED',
     blockResources: ['image', 'font', 'media'],
+    // Spinneys uses a custom "Ð" currency symbol rendered via a special font.
+    // Claude Vision (Haiku) misreads it as a digit, corrupting the first digit of the price.
+    // Force selector-first so [data-price-amount] is read directly from the DOM attribute.
+    preferSelectors: true,
   },
 
   'union-coop': {

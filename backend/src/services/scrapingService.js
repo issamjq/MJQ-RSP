@@ -58,9 +58,10 @@ async function resolveSelectors(urlRecord) {
 
     waitFor: dbConfig?.wait_for_selector || fallback.waitForSelector || null,
 
-    pageOptions:    dbConfig?.page_options    || fallback.pageOptions    || {},
-    blockResources: fallback.blockResources   || ['image', 'font', 'media'],
-    currency:       urlRecord.currency        || fallback.currency       || 'AED',
+    pageOptions:     dbConfig?.page_options    || fallback.pageOptions    || {},
+    blockResources:  fallback.blockResources   || ['image', 'font', 'media'],
+    currency:        urlRecord.currency        || fallback.currency       || 'AED',
+    preferSelectors: fallback.preferSelectors  || false,
   };
 }
 
