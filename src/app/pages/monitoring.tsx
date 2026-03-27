@@ -6,6 +6,7 @@ import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperA
 import type { ProductCompanyUrl, PriceSnapshot, Company, Product } from '../../lib/monitorApi';
 import { toast } from 'sonner';
 import { MultiSelect } from '../components/multi-select';
+import { SearchableSelect } from '../components/searchable-select';
 
 function formatRelTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -319,17 +320,21 @@ function ProductUrlsTab() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Product *</label>
-                      <select value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none text-sm">
-                        <option value="">Select product</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.internal_name}</option>)}
-                      </select>
+                      <SearchableSelect
+                        placeholder="Select product"
+                        options={products.map(p => ({ value: String(p.id), label: p.internal_name }))}
+                        value={form.product_id}
+                        onChange={v => setForm(f => ({ ...f, product_id: v }))}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
-                      <select value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none text-sm">
-                        <option value="">Select company</option>
-                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
+                      <SearchableSelect
+                        placeholder="Select company"
+                        options={companies.map(c => ({ value: String(c.id), label: c.name }))}
+                        value={form.company_id}
+                        onChange={v => setForm(f => ({ ...f, company_id: v }))}
+                      />
                     </div>
                   </>
                 )}
