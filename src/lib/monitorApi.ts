@@ -151,6 +151,8 @@ export const snapshotsApi = {
     api.get<ApiResponse<PriceSnapshot[]>>("/api/price-snapshots/latest", params as Record<string, string | number | boolean | undefined>),
   delete: (id: number) =>
     api.del<{ success: boolean; message: string }>(`/api/price-snapshots/${id}`),
+  deleteBulk: (ids: number[]) =>
+    api.post<{ success: boolean; deleted: number }>(`/api/price-snapshots/bulk-delete`, { ids }),
 };
 
 export const syncRunsApi = {

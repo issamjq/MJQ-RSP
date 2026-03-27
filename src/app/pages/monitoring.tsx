@@ -499,6 +499,16 @@ function PricesTab() {
     try { await snapshotsApi.delete(id); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); }
   };
 
+  const handleDeleteBulk = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    try {
+      await snapshotsApi.deleteBulk(ids);
+      toast.success(`Deleted ${ids.length} record${ids.length !== 1 ? 's' : ''}`);
+      setSelectedRows(new Set());
+      load();
+    } catch { toast.error('Bulk delete failed'); }
+  };
+
   const filtered = useMemo(() => {
     let result = applyDateFilter(snapshots, dateFilter, customStart, customEnd);
     if (searchTerm.trim()) {
@@ -684,7 +694,16 @@ function PricesTab() {
                 <span>{someSelected ? `${selectedRows.size} selected` : `${filtered.length} items`}</span>
               </label>
               {someSelected && (
-                <button onClick={() => setSelectedRows(new Set())} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
+                <>
+                  <button onClick={() => setSelectedRows(new Set())} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
+                  <button
+                    onClick={() => handleDeleteBulk(Array.from(selectedRows))}
+                    className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete {selectedRows.size}
+                  </button>
+                </>
               )}
             </div>
 
@@ -699,7 +718,7 @@ function PricesTab() {
               return (
                 <div key={productName} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                   <div
-                    className="px-4 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                    className="px-4 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors select-none group"
                     onClick={() => toggleGroup(productName)}
                   >
                     <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isCollapsed ? '' : 'rotate-90'}`} />
@@ -710,7 +729,7 @@ function PricesTab() {
                       ) : null;
                     })()}
                     <span className="font-semibold text-sm flex-1 truncate">{productName}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">{items.length} store{items.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{items.length} record{items.length !== 1 ? 's' : ''}</span>
                     {minP !== null && (
                       <span className="text-xs font-medium shrink-0 hidden sm:block">
                         {minP === maxP ? `${currency} ${minP.toFixed(2)}` : `${currency} ${minP.toFixed(2)} – ${maxP!.toFixed(2)}`}
@@ -719,6 +738,13 @@ function PricesTab() {
                     {groupSelectedCount > 0 && (
                       <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full shrink-0">{groupSelectedCount}</span>
                     )}
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteBulk(items.map(s => s.id)); }}
+                      title={`Delete all ${items.length} records for this product`}
+                      className="p-1 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </button>
                   </div>
 
                   {!isCollapsed && (

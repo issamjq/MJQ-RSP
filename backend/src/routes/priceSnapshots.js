@@ -12,6 +12,9 @@ router.get('/latest',   ctrl.getLatest);
 // GET /api/price-snapshots/history?product_id=&company_id=&days=30
 router.get('/history',  ctrl.getHistory);
 
+// POST /api/price-snapshots/bulk-delete  — delete multiple by IDs { ids: [1,2,3] }
+router.post('/bulk-delete', ctrl.bulkRemove);
+
 // DELETE /api/price-snapshots/:id
 router.delete('/:id',   ctrl.remove);
 

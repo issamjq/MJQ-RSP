@@ -173,4 +173,17 @@ async function remove(id) {
   return rows[0] || null;
 }
 
-module.exports = { create, getAll, getLatestPrices, getPriceHistory, remove };
+/**
+ * Delete multiple snapshots by IDs.
+ */
+async function removeMany(ids) {
+  if (!ids || ids.length === 0) return 0;
+  const cleaned = ids.map(Number).filter(Boolean);
+  const { rowCount } = await db.query(
+    `DELETE FROM price_snapshots WHERE id = ANY($1::int[])`,
+    [cleaned]
+  );
+  return rowCount;
+}
+
+module.exports = { create, getAll, getLatestPrices, getPriceHistory, remove, removeMany };

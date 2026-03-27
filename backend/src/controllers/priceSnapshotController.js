@@ -44,4 +44,15 @@ async function remove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getLatest, getHistory, remove };
+async function bulkRemove(req, res, next) {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: { message: 'ids array required', code: 'VALIDATION_ERROR' } });
+    }
+    const count = await snapshotService.removeMany(ids);
+    res.json({ success: true, deleted: count });
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, getLatest, getHistory, remove, bulkRemove };

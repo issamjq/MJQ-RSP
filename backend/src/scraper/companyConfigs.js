@@ -97,14 +97,16 @@ const configs = {
 
   'spinneys': {
     priceSelectors: [
-      // Magento stores the raw price in data-price-amount attribute — exact float, no font/OCR issues.
-      // data-price-type="finalPrice" targets the actual selling price, not min/max/per-unit variants.
-      '[data-price-type="finalPrice"]',
-      '[data-price-amount]',
+      // OpenGraph / Facebook meta tag — exact numeric price, immune to font tricks
+      'meta[property="product:price:amount"]',
+      // JSON-LD / microdata
+      '[itemprop="price"]',
+      // Magento price widget scoped to product-info-main (Spinneys theme class)
+      '.product-info-main [data-price-type="finalPrice"]',
+      '.product-info-main [data-price-amount]',
+      // Broader Magento fallbacks
       '.price-box .price',
       '.regular-price .price',
-      '.product-info-price .price',
-      '.product-info-price .wee-price',
     ],
     titleSelectors: [
       'h1.page-title span',

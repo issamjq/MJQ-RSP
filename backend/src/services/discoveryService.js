@@ -526,14 +526,43 @@ async function discoverProducts(companyId, searchQuery = 'marvis') {
 
   // ── 6. Check already-tracked URLs ─────────────────────────────────────────
   let trackedSet = new Set();
+  const trackedUrlMap = new Map(); // product_url → { id, product_id, company_id }
   if (matchResults.length > 0) {
     const urls = matchResults.map((r) => r.found.url);
     const { rows } = await query(
-      `SELECT product_url FROM product_company_urls
+      `SELECT id, product_id, company_id, product_url FROM product_company_urls
        WHERE company_id = $1 AND product_url = ANY($2::text[])`,
       [companyId, urls]
     );
-    trackedSet = new Set(rows.map((r) => r.product_url));
+    rows.forEach((r) => {
+      trackedSet.add(r.product_url);
+      trackedUrlMap.set(r.product_url, { id: r.id, product_id: r.product_id, company_id: r.company_id });
+    });
+  }
+
+  // Save fresh price snapshots for already-tracked URLs (captures price changes from discovery)
+  for (const r of matchResults) {
+    if (!trackedSet.has(r.found.url)) continue;
+    const tracked = trackedUrlMap.get(r.found.url);
+    const price = r.found?.price ?? null;
+    if (!tracked || price === null) continue;
+    await query(
+      `INSERT INTO price_snapshots
+         (product_id, company_id, product_company_url_id,
+          price, original_price, currency, availability,
+          raw_price_text, scrape_status, checked_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'success',NOW(),NOW())`,
+      [
+        tracked.product_id,
+        tracked.company_id,
+        tracked.id,
+        price,
+        r.found.original_price || null,
+        r.found.currency || 'AED',
+        r.found.availability || 'unknown',
+        String(price),
+      ]
+    ).catch((err) => logger.warn('[Discovery] Already-tracked snapshot failed', { err: err.message }));
   }
 
   const results = matchResults.map((r) => ({
