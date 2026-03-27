@@ -97,7 +97,9 @@ const configs = {
 
   'spinneys': {
     priceSelectors: [
-      // data-price-amount is a Magento attribute with the raw numeric value — exact, no OCR needed
+      // Magento stores the raw price in data-price-amount attribute — exact float, no font/OCR issues.
+      // data-price-type="finalPrice" targets the actual selling price, not min/max/per-unit variants.
+      '[data-price-type="finalPrice"]',
       '[data-price-amount]',
       '.price-box .price',
       '.regular-price .price',
