@@ -1,5 +1,5 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Compass, Sparkles, Search, ChevronDown, Check, Loader2, ExternalLink, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react';
+import { Compass, Sparkles, Search, ChevronDown, Check, Loader2, ExternalLink, CheckCircle2, XCircle, Circle, AlertTriangle, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useDiscovery, sizeMismatch } from '../contexts/discovery-context';
 import type { LogStep, Phase } from '../contexts/discovery-context';
@@ -68,7 +68,7 @@ function formatElapsed(ms: number): string {
   return rem > 0 ? `${m} min ${rem} sec` : `${m} min`;
 }
 
-function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number }) {
+function ThinkingLog({ steps, startedAt, onDismiss }: { steps: LogStep[]; startedAt: number; onDismiss: () => void }) {
   const isDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
   const [, setTick] = useState(0);
 
@@ -99,6 +99,11 @@ function ThinkingLog({ steps, startedAt }: { steps: LogStep[]; startedAt: number
           )}
           {isDone && totalTook !== null && (
             <span className="text-green-600 tabular-nums">finished in {formatDone(totalTook)}</span>
+          )}
+          {isDone && (
+            <button onClick={onDismiss} className="p-1 rounded hover:bg-gray-100 transition-colors" title="Dismiss">
+              <X className="w-3.5 h-3.5 text-gray-400" />
+            </button>
           )}
         </div>
       </div>
@@ -209,6 +214,10 @@ export function Discovering() {
   // Local UI state only
   const [showDropdown, setShowDropdown] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
+  const [showLog, setShowLog] = useState(true);
+
+  // Reset log visibility whenever a new run starts
+  useEffect(() => { if (phase === 'processing') setShowLog(true); }, [phase]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Click-outside to close company dropdown
@@ -393,9 +402,9 @@ export function Discovering() {
           </div>
 
           {/* AI thinking log */}
-          {logSteps.length > 0 && (
+          {logSteps.length > 0 && phase !== 'search' && showLog && (
             <div className="mb-5">
-              <ThinkingLog steps={logSteps} startedAt={discoverStartedAt} />
+              <ThinkingLog steps={logSteps} startedAt={discoverStartedAt} onDismiss={() => setShowLog(false)} />
             </div>
           )}
 
