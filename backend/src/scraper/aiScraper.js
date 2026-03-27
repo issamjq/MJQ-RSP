@@ -48,7 +48,8 @@ Extract the following fields from what you see on screen and return ONLY a JSON 
 }
 
 Rules:
-- price: the highlighted/current selling price (what customer pays now)
+- price: the highlighted/current selling price (what customer pays now). Read the digits carefully.
+- IMPORTANT: Some UAE sites use a custom currency symbol that looks like "Ð", "₫", "B", or a stylised "D" before the price — this is just their AED symbol, NOT a digit. Ignore it completely and read only the numeric digits. Example: "Ð 49.50" → price is 49.50, NOT 19.50 or 9.50.
 - original_price: ONLY set if a strikethrough/was-price is visibly shown next to the current price; otherwise null
 - title: the main product heading, include size/variant (e.g. "Marvis Classic Strong Mint 75ml")
 - availability: "in_stock" if Add to Cart / Buy Now is active, "out_of_stock" if sold out, else "unknown"
