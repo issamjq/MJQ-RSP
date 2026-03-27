@@ -1,7 +1,7 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Skeleton } from '../components/ui/skeleton';
 import { Package, Search, Grid3x3, List, RefreshCw, Download, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { productsApi } from '../../lib/monitorApi';
 import type { Product } from '../../lib/monitorApi';
 import { toast } from 'sonner';
@@ -27,6 +27,22 @@ export function Products() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [sortKey, setSortKey] = useState<'name' | 'brand' | 'sku'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: typeof sortKey) => {
+    if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const si = (key: string) => sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+
+  const sortedProducts = useMemo(() => [...products].sort((a, b) => {
+    const d = sortDir === 'asc' ? 1 : -1;
+    if (sortKey === 'name') return a.internal_name.localeCompare(b.internal_name) * d;
+    if (sortKey === 'brand') return (a.brand ?? '').localeCompare(b.brand ?? '') * d;
+    if (sortKey === 'sku') return (a.internal_sku ?? '').localeCompare(b.internal_sku ?? '') * d;
+    return 0;
+  }), [products, sortKey, sortDir]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -229,15 +245,15 @@ export function Products() {
                 <table className="w-full">
                   <thead className="bg-gray-50/50 border-b border-gray-100">
                     <tr>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Brand</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">SKU</th>
+                      <th onClick={() => handleSort('name')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Product{si('name')}</th>
+                      <th onClick={() => handleSort('brand')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Brand{si('brand')}</th>
+                      <th onClick={() => handleSort('sku')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden md:table-cell">SKU{si('sku')}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Barcode</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {products.map((product) => (
+                    {sortedProducts.map((product) => (
                       <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">

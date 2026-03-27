@@ -1,7 +1,7 @@
 import { AppSidebar } from '../components/app-sidebar';
 import { Skeleton } from '../components/ui/skeleton';
 import { Building2, RefreshCw, Plus, Edit, Trash2, CheckCircle2, X, Loader2 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { companiesApi } from '../../lib/monitorApi';
 import type { Company } from '../../lib/monitorApi';
 import { toast } from 'sonner';
@@ -9,6 +9,22 @@ import { toast } from 'sonner';
 export function Companies() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<'name' | 'slug' | 'status'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: typeof sortKey) => {
+    if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const si = (key: string) => sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+
+  const sortedCompanies = useMemo(() => [...companies].sort((a, b) => {
+    const d = sortDir === 'asc' ? 1 : -1;
+    if (sortKey === 'name') return a.name.localeCompare(b.name) * d;
+    if (sortKey === 'slug') return a.slug.localeCompare(b.slug) * d;
+    if (sortKey === 'status') return (Number(b.is_active) - Number(a.is_active)) * d;
+    return 0;
+  }), [companies, sortKey, sortDir]);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Company | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,15 +129,15 @@ export function Companies() {
                 <table className="w-full">
                   <thead className="bg-gray-50/50 border-b border-gray-100">
                     <tr>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Company</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Slug</th>
+                      <th onClick={() => handleSort('name')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Company{si('name')}</th>
+                      <th onClick={() => handleSort('slug')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Slug{si('slug')}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Base URL</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Status</th>
+                      <th onClick={() => handleSort('status')} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Status{si('status')}</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {companies.map((company) => (
+                    {sortedCompanies.map((company) => (
                       <tr key={company.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">

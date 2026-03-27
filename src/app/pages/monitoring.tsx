@@ -31,6 +31,21 @@ function ProductUrlsTab() {
   const [progressRunId, setProgressRunId] = useState<number | null>(null);
   const [progress, setProgress] = useState<{ total: number; done: number; success: number; fail: number } | null>(null);
   const [form, setForm] = useState({ product_id: '', company_id: '', product_url: '', currency: 'AED' });
+  const [urlSortKey, setUrlSortKey] = useState<'product' | 'company' | 'last_check' | 'status'>('product');
+  const [urlSortDir, setUrlSortDir] = useState<'asc' | 'desc'>('asc');
+  const handleUrlSort = (key: typeof urlSortKey) => {
+    if (key === urlSortKey) setUrlSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setUrlSortKey(key); setUrlSortDir('asc'); }
+  };
+  const usi = (key: string) => urlSortKey === key ? (urlSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+  const sortedUrls = useMemo(() => [...urls].sort((a, b) => {
+    const d = urlSortDir === 'asc' ? 1 : -1;
+    if (urlSortKey === 'product') return a.internal_name.localeCompare(b.internal_name) * d;
+    if (urlSortKey === 'company') return a.company_name.localeCompare(b.company_name) * d;
+    if (urlSortKey === 'last_check') return ((a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0) - (b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0)) * d;
+    if (urlSortKey === 'status') return (a.last_status ?? '').localeCompare(b.last_status ?? '') * d;
+    return 0;
+  }), [urls, urlSortKey, urlSortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,16 +208,16 @@ function ProductUrlsTab() {
                   <th className="px-4 py-3 w-10">
                     <input type="checkbox" checked={selected.size === urls.length && urls.length > 0} ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < urls.length; }} onChange={toggleAll} className="rounded" />
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">Product</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Company</th>
+                  <th onClick={() => handleUrlSort('product')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Product{usi('product')}</th>
+                  <th onClick={() => handleUrlSort('company')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Company{usi('company')}</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">URL</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Last Check</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Status</th>
+                  <th onClick={() => handleUrlSort('last_check')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell">Last Check{usi('last_check')}</th>
+                  <th onClick={() => handleUrlSort('status')} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell">Status{usi('status')}</th>
                   <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase text-left">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {urls.map((u) => (
+                {sortedUrls.map((u) => (
                   <tr key={u.id} className={`hover:bg-gray-50/50 transition-colors ${selected.has(u.id) ? 'bg-blue-50/30' : ''}`}>
                     <td className="px-4 py-3">
                       <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)} className="rounded" />
@@ -339,14 +354,20 @@ function printSelected(snapshots: PriceSnapshot[]) {
   if (!w) return;
   const date = new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const rows = snapshots.map((s, i) => {
+    const hasDiscount = s.price != null && s.original_price != null && s.original_price !== s.price && Number(s.original_price) > Number(s.price);
+    const discountPct = hasDiscount ? Math.round((Number(s.original_price) - Number(s.price)) / Number(s.original_price) * 100) : null;
     const priceCell = s.price != null
-      ? `<td style="font-weight:600">${s.currency ?? ''} ${Number(s.price).toFixed(2)}${s.original_price != null && s.original_price !== s.price ? `<br><span style="text-decoration:line-through;color:#999;font-weight:400;font-size:10px">${s.currency ?? ''} ${Number(s.original_price).toFixed(2)}</span>` : ''}</td>`
+      ? `<td style="font-weight:600">${s.currency ?? ''} ${Number(s.price).toFixed(2)}${hasDiscount ? `<br><span style="text-decoration:line-through;color:#999;font-weight:400;font-size:10px">${s.currency ?? ''} ${Number(s.original_price).toFixed(2)}</span>` : ''}</td>`
       : '<td style="color:#999">—</td>';
+    const discountCell = discountPct != null
+      ? `<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:700;font-size:10px;letter-spacing:.03em">−${discountPct}%</span></td>`
+      : '<td style="color:#ccc">—</td>';
     return `<tr>
       <td>${i + 1}</td>
       <td>${s.internal_name ?? '—'}</td>
       <td>${s.company_name ?? '—'}</td>
       ${priceCell}
+      ${discountCell}
       <td>${formatDateTime(s.checked_at)}</td>
     </tr>`;
   }).join('');
@@ -370,7 +391,7 @@ function printSelected(snapshots: PriceSnapshot[]) {
       <div class="meta"><div>${snapshots.length} item${snapshots.length !== 1 ? 's' : ''}</div><div>Exported ${date}</div></div>
     </header>
     <table>
-      <thead><tr><th>#</th><th>Product</th><th>Store Name</th><th>Price</th><th>Recorded</th></tr></thead>
+      <thead><tr><th>#</th><th>Product</th><th>Store Name</th><th>Price</th><th>Discount</th><th>Recorded</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></body></html>`);
   w.document.close();
@@ -388,6 +409,13 @@ function PricesTab() {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [priceSortKey, setPriceSortKey] = useState<'store' | 'price' | 'discount' | 'recorded'>('store');
+  const [priceSortDir, setPriceSortDir] = useState<'asc' | 'desc'>('asc');
+  const handlePriceSort = (key: typeof priceSortKey) => {
+    if (key === priceSortKey) setPriceSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setPriceSortKey(key); setPriceSortDir('asc'); }
+  };
+  const psi = (key: string) => priceSortKey === key ? (priceSortDir === 'asc' ? ' ↑' : ' ↓') : '';
   const [storeList, setStoreList] = useState<Company[]>([]);
   const [productList, setProductList] = useState<Product[]>([]);
 
@@ -617,16 +645,31 @@ function PricesTab() {
                               />
                             </th>
                             <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase w-10">#</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Store Name</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Price</th>
-                            <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Recorded</th>
+                            <th onClick={() => handlePriceSort('store')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Store Name{psi('store')}</th>
+                            <th onClick={() => handlePriceSort('price')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none">Price{psi('price')}</th>
+                            <th onClick={() => handlePriceSort('discount')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden sm:table-cell">Discount{psi('discount')}</th>
+                            <th onClick={() => handlePriceSort('recorded')} className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:text-foreground select-none hidden lg:table-cell">Recorded{psi('recorded')}</th>
                             <th className="w-8 px-3 py-2" />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {items.map(snap => {
+                          {[...items].sort((a, b) => {
+                            const d = priceSortDir === 'asc' ? 1 : -1;
+                            if (priceSortKey === 'store') return a.company_name.localeCompare(b.company_name) * d;
+                            if (priceSortKey === 'price') return ((a.price ?? Infinity) - (b.price ?? Infinity)) * d;
+                            if (priceSortKey === 'discount') {
+                              const da = a.original_price && a.price && Number(a.original_price) > Number(a.price) ? (Number(a.original_price) - Number(a.price)) / Number(a.original_price) : 0;
+                              const db = b.original_price && b.price && Number(b.original_price) > Number(b.price) ? (Number(b.original_price) - Number(b.price)) / Number(b.original_price) : 0;
+                              return (da - db) * d;
+                            }
+                            if (priceSortKey === 'recorded') return (new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()) * d;
+                            return 0;
+                          }).map(snap => {
                             const idx = rowIndices.get(snap.id) ?? 0;
                             const isSelected = selectedRows.has(snap.id);
+                            const hasDiscount = snap.price != null && snap.original_price != null && snap.original_price !== snap.price && Number(snap.original_price) > Number(snap.price);
+                            const discountPct = hasDiscount ? Math.round((Number(snap.original_price) - Number(snap.price)) / Number(snap.original_price) * 100) : null;
+                            const storeLogo = storeMap.get(snap.company_id)?.logo_url;
                             return (
                               <tr key={snap.id} className={`transition-colors ${isSelected ? 'bg-amber-50/40' : 'hover:bg-gray-50/50'}`}>
                                 <td className="px-4 py-2.5">
@@ -635,12 +678,9 @@ function PricesTab() {
                                 <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums">{idx}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center gap-2">
-                                    {(() => {
-                                      const logo = storeMap.get(snap.company_id)?.logo_url;
-                                      return logo ? (
-                                        <img src={logo} alt="" className="w-7 h-7 rounded-md object-contain bg-gray-50 border border-gray-200 p-0.5 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                                      ) : null;
-                                    })()}
+                                    {storeLogo && (
+                                      <img src={storeLogo} alt="" className="w-7 h-7 rounded-md object-contain bg-gray-50 border border-gray-200 p-0.5 shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    )}
                                     <span className="text-sm font-medium">{snap.company_name}</span>
                                   </div>
                                 </td>
@@ -649,10 +689,15 @@ function PricesTab() {
                                     <span className="text-sm font-semibold">
                                       {snap.price != null ? `${snap.currency} ${Number(snap.price).toFixed(2)}` : <span className="text-muted-foreground font-normal">—</span>}
                                     </span>
-                                    {snap.original_price != null && snap.original_price !== snap.price && (
+                                    {hasDiscount && (
                                       <div className="text-xs text-muted-foreground line-through leading-tight">{snap.currency} {Number(snap.original_price).toFixed(2)}</div>
                                     )}
                                   </div>
+                                </td>
+                                <td className="px-3 py-2.5 hidden sm:table-cell">
+                                  {discountPct != null
+                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-800">−{discountPct}%</span>
+                                    : <span className="text-xs text-muted-foreground">—</span>}
                                 </td>
                                 <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">{formatDateTime(snap.checked_at)}</td>
                                 <td className="px-3 py-2.5">
