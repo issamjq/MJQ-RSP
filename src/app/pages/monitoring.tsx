@@ -1,5 +1,5 @@
 import { AppSidebar } from '../components/app-sidebar';
-import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer, ChevronRight, ExternalLink } from 'lucide-react';
+import { Plus, Play, Edit, Trash2, X, Loader2, RefreshCw, Sparkles, LayoutList, LayoutGrid, Printer, ChevronRight, ExternalLink, Search } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { urlsApi, snapshotsApi, syncRunsApi, companiesApi, productsApi, scraperApi } from '../../lib/monitorApi';
@@ -409,6 +409,9 @@ function PricesTab() {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStore, setFilterStore] = useState('');
+  const [filterProduct, setFilterProduct] = useState('');
   const [priceSortKey, setPriceSortKey] = useState<'store' | 'price' | 'discount' | 'recorded'>('store');
   const [priceSortDir, setPriceSortDir] = useState<'asc' | 'desc'>('asc');
   const handlePriceSort = (key: typeof priceSortKey) => {
@@ -448,10 +451,19 @@ function PricesTab() {
     try { await snapshotsApi.delete(id); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); }
   };
 
-  const filtered = useMemo(
-    () => applyDateFilter(snapshots, dateFilter, customStart, customEnd),
-    [snapshots, dateFilter, customStart, customEnd],
-  );
+  const filtered = useMemo(() => {
+    let result = applyDateFilter(snapshots, dateFilter, customStart, customEnd);
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(s =>
+        s.internal_name.toLowerCase().includes(q) ||
+        s.company_name.toLowerCase().includes(q)
+      );
+    }
+    if (filterStore) result = result.filter(s => String(s.company_id) === filterStore);
+    if (filterProduct) result = result.filter(s => String(s.product_id) === filterProduct);
+    return result;
+  }, [snapshots, dateFilter, customStart, customEnd, searchTerm, filterStore, filterProduct]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, PriceSnapshot[]>();
@@ -506,6 +518,44 @@ function PricesTab() {
             <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
               className="px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white" />
           </div>
+        )}
+      </div>
+
+      {/* Search + filters */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search product or store…"
+            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5"
+          />
+        </div>
+        <select
+          value={filterStore}
+          onChange={e => setFilterStore(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5 text-gray-600"
+        >
+          <option value="">All Stores</option>
+          {storeList.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+        </select>
+        <select
+          value={filterProduct}
+          onChange={e => setFilterProduct(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5 text-gray-600"
+        >
+          <option value="">All Products</option>
+          {productList.map(p => <option key={p.id} value={String(p.id)}>{p.internal_name}</option>)}
+        </select>
+        {(searchTerm || filterStore || filterProduct) && (
+          <button
+            onClick={() => { setSearchTerm(''); setFilterStore(''); setFilterProduct(''); }}
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white hover:bg-gray-50 text-gray-500 transition-colors"
+          >
+            Clear filters
+          </button>
         )}
       </div>
 
