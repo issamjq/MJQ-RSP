@@ -17,6 +17,52 @@ function formatRelTime(iso: string) {
 }
 
 
+// ---- MultiSelect dropdown ----
+function MultiSelect({ label, options, selected, onChange }: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: Set<string>;
+  onChange: (s: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (v: string) => {
+    const n = new Set(selected);
+    n.has(v) ? n.delete(v) : n.add(v);
+    onChange(n);
+  };
+  const count = selected.size;
+  const btnLabel = count === 0 ? `All ${label}` : `${label}: ${count}`;
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg bg-white transition-colors ${count > 0 ? 'border-black text-black font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+      >
+        {btnLabel}
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 min-w-[200px] max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100">
+              <button onClick={() => onChange(new Set(options.map(o => o.value)))} className="text-xs text-blue-600 hover:underline">All</button>
+              <span className="text-gray-300">·</span>
+              <button onClick={() => onChange(new Set())} className="text-xs text-gray-500 hover:underline">None</button>
+            </div>
+            {options.map(o => (
+              <label key={o.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={selected.has(o.value)} onChange={() => toggle(o.value)} className="w-3.5 h-3.5 accent-black rounded" />
+                <span className="text-sm text-gray-700 truncate max-w-[180px]">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---- Product URLs Tab ----
 function ProductUrlsTab() {
   const [urls, setUrls] = useState<ProductCompanyUrl[]>([]);
@@ -410,8 +456,8 @@ function PricesTab() {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStore, setFilterStore] = useState('');
-  const [filterProduct, setFilterProduct] = useState('');
+  const [filterStores, setFilterStores] = useState<Set<string>>(new Set());
+  const [filterProducts, setFilterProducts] = useState<Set<string>>(new Set());
   const [priceSortKey, setPriceSortKey] = useState<'store' | 'price' | 'discount' | 'recorded'>('store');
   const [priceSortDir, setPriceSortDir] = useState<'asc' | 'desc'>('asc');
   const handlePriceSort = (key: typeof priceSortKey) => {
@@ -460,10 +506,10 @@ function PricesTab() {
         s.company_name.toLowerCase().includes(q)
       );
     }
-    if (filterStore) result = result.filter(s => String(s.company_id) === filterStore);
-    if (filterProduct) result = result.filter(s => String(s.product_id) === filterProduct);
+    if (filterStores.size > 0) result = result.filter(s => filterStores.has(String(s.company_id)));
+    if (filterProducts.size > 0) result = result.filter(s => filterProducts.has(String(s.product_id)));
     return result;
-  }, [snapshots, dateFilter, customStart, customEnd, searchTerm, filterStore, filterProduct]);
+  }, [snapshots, dateFilter, customStart, customEnd, searchTerm, filterStores, filterProducts]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, PriceSnapshot[]>();
@@ -533,25 +579,21 @@ function PricesTab() {
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5"
           />
         </div>
-        <select
-          value={filterStore}
-          onChange={e => setFilterStore(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5 text-gray-600"
-        >
-          <option value="">All Stores</option>
-          {storeList.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-        </select>
-        <select
-          value={filterProduct}
-          onChange={e => setFilterProduct(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black/5 text-gray-600"
-        >
-          <option value="">All Products</option>
-          {productList.map(p => <option key={p.id} value={String(p.id)}>{p.internal_name}</option>)}
-        </select>
-        {(searchTerm || filterStore || filterProduct) && (
+        <MultiSelect
+          label="Stores"
+          options={storeList.map(c => ({ value: String(c.id), label: c.name }))}
+          selected={filterStores}
+          onChange={setFilterStores}
+        />
+        <MultiSelect
+          label="Products"
+          options={productList.map(p => ({ value: String(p.id), label: p.internal_name }))}
+          selected={filterProducts}
+          onChange={setFilterProducts}
+        />
+        {(searchTerm || filterStores.size > 0 || filterProducts.size > 0) && (
           <button
-            onClick={() => { setSearchTerm(''); setFilterStore(''); setFilterProduct(''); }}
+            onClick={() => { setSearchTerm(''); setFilterStores(new Set()); setFilterProducts(new Set()); }}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white hover:bg-gray-50 text-gray-500 transition-colors"
           >
             Clear filters
