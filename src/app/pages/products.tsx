@@ -134,7 +134,9 @@ export function Products() {
     if (!mapped.length) { toast.error('No valid rows found'); return; }
     try {
       const res = await productsApi.import(mapped);
-      toast.success(`Imported ${res.data.inserted} new, updated ${res.data.updated}`);
+      const { inserted, updated, skipped } = res.data;
+      const parts = [`${inserted} added`, `${updated} updated`, `${skipped} skipped (no changes)`];
+      toast.success(`Import complete — ${parts.join(' · ')}`);
       load();
     } catch {
       toast.error('Import failed');

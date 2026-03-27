@@ -112,9 +112,10 @@ async function remove(id) {
 }
 
 async function bulkImport(items) {
-  let inserted = 0, updated = 0;
+  let inserted = 0, updated = 0, skipped = 0;
   for (const item of items) {
     if (!item.internal_name || !item.internal_sku) continue;
+    const rsp = item.initial_rsp != null && item.initial_rsp !== '' ? Number(item.initial_rsp) : null;
     const { rows } = await db.query(
       `INSERT INTO products (internal_name, internal_sku, barcode, brand, image_url, initial_rsp, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -126,14 +127,24 @@ async function bulkImport(items) {
          initial_rsp   = EXCLUDED.initial_rsp,
          is_active     = EXCLUDED.is_active,
          updated_at    = NOW()
+       WHERE (
+         products.internal_name  IS DISTINCT FROM EXCLUDED.internal_name  OR
+         products.barcode        IS DISTINCT FROM EXCLUDED.barcode        OR
+         products.brand          IS DISTINCT FROM EXCLUDED.brand          OR
+         products.image_url      IS DISTINCT FROM EXCLUDED.image_url      OR
+         products.initial_rsp    IS DISTINCT FROM EXCLUDED.initial_rsp    OR
+         products.is_active      IS DISTINCT FROM EXCLUDED.is_active
+       )
        RETURNING (xmax = 0) AS inserted`,
       [item.internal_name, String(item.internal_sku),
        item.barcode || null, item.brand || null,
-       item.image_url || null, item.initial_rsp != null ? Number(item.initial_rsp) : null, item.is_active ?? true]
+       item.image_url || null, rsp, item.is_active ?? true]
     );
-    if (rows[0]?.inserted) inserted++; else updated++;
+    if (rows.length === 0) skipped++;
+    else if (rows[0].inserted) inserted++;
+    else updated++;
   }
-  return { inserted, updated, total: inserted + updated };
+  return { inserted, updated, skipped, total: inserted + updated + skipped };
 }
 
 module.exports = { getAll, getById, create, update, remove, bulkImport };
