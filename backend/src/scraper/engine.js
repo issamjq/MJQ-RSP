@@ -284,22 +284,16 @@ class ScraperEngine {
         } else if (tagName === 'input') {
           text = await element.getAttribute('value');
         } else {
-          // For [data-price-amount] style selectors: prefer reading the attribute
-          // value directly — it contains the raw decimal number (e.g. "49.50"),
-          // whereas textContent can contain a custom currency glyph that confuses parsers.
-          const simplePropMatch = selector.match(/^\[([a-zA-Z][a-zA-Z0-9-]*)\]$/);
-          if (simplePropMatch) {
-            const attrVal = await element.getAttribute(simplePropMatch[1]);
+          // For data-price-* attribute selectors (e.g. [data-price-amount],
+          // [data-price-type="finalPrice"]), read data-price-amount directly —
+          // it contains the raw decimal number without the custom Ð currency glyph.
+          // For all other selectors (class, element, itemprop…) use textContent
+          // so we don't accidentally pick up a wrong data-price-amount from an
+          // unrelated element that happens to share the matched element.
+          if (/\[data-price-/.test(selector)) {
+            const attrVal = await element.getAttribute('data-price-amount');
             if (attrVal && attrVal.trim()) {
               text = attrVal.trim();
-            }
-          }
-          // Also try data-price-amount attribute regardless of the selector used
-          // (e.g. selector is [data-price-type="finalPrice"] but value is on data-price-amount)
-          if (!text || !text.trim()) {
-            const priceAttr = await element.getAttribute('data-price-amount');
-            if (priceAttr && priceAttr.trim()) {
-              text = priceAttr.trim();
             }
           }
           // Fall back to visible text content
