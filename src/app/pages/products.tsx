@@ -50,6 +50,10 @@ export function Products() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ internal_name: '', brand: '', internal_sku: '', barcode: '', image_url: '', initial_rsp: '' });
   const csvRef = useRef<HTMLInputElement>(null);
+  const [csvRows, setCsvRows] = useState<Array<Record<string, string>>>([]);
+  const [showBrandFilter, setShowBrandFilter] = useState(false);
+  const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async (q?: string) => {
     setLoading(true);
@@ -118,9 +122,17 @@ export function Products() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const rows = parseCsv(text);
-    const mapped = rows
-      .filter(r => r['Item Name'] || r['internal_name'])
+    const rows = parseCsv(text).filter(r => r['Item Name'] || r['internal_name']);
+    if (!rows.length) { toast.error('No valid rows found'); return; }
+    const brands = [...new Set(rows.map(r => r['Brand'] || r['brand'] || '').filter(Boolean))].sort();
+    setCsvRows(rows);
+    setSelectedBrands(new Set(brands));
+    setShowBrandFilter(true);
+    if (csvRef.current) csvRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    const filtered = csvRows
       .map(r => ({
         internal_name: r['Item Name'] || r['internal_name'] || '',
         internal_sku: r['Id'] || r['internal_sku'] || '',
@@ -130,18 +142,21 @@ export function Products() {
         initial_rsp: r['Initial RSP'] || r['initial_rsp'] || '',
         is_active: (r['Is Visible'] || r['is_active'] || 'true').toLowerCase() !== 'false',
       }))
-      .filter(r => r.internal_name);
-    if (!mapped.length) { toast.error('No valid rows found'); return; }
+      .filter(r => r.internal_name && (selectedBrands.size === 0 || selectedBrands.has(r.brand)));
+    if (!filtered.length) { toast.error('No products match the selected brands'); return; }
+    setImporting(true);
     try {
-      const res = await productsApi.import(mapped);
+      const res = await productsApi.import(filtered);
       const { inserted, updated, skipped } = res.data;
       const parts = [`${inserted} added`, `${updated} updated`, `${skipped} skipped (no changes)`];
       toast.success(`Import complete — ${parts.join(' · ')}`);
+      setShowBrandFilter(false);
       load();
     } catch {
       toast.error('Import failed');
+    } finally {
+      setImporting(false);
     }
-    if (csvRef.current) csvRef.current.value = '';
   };
 
   const brandColors = ['bg-green-50 text-green-700 border-green-200', 'bg-blue-50 text-blue-700 border-blue-200', 'bg-purple-50 text-purple-700 border-purple-200', 'bg-orange-50 text-orange-700 border-orange-200', 'bg-pink-50 text-pink-700 border-pink-200'];
@@ -370,6 +385,58 @@ export function Products() {
           </div>
         </>
       )}
+
+      {/* Brand filter modal for CSV import */}
+      {showBrandFilter && (() => {
+        const allBrands = [...new Set(csvRows.map(r => r['Brand'] || r['brand'] || '').filter(Boolean))].sort();
+        const noBrand = csvRows.filter(r => !(r['Brand'] || r['brand'])).length;
+        const toggleBrand = (b: string) => setSelectedBrands(prev => { const n = new Set(prev); n.has(b) ? n.delete(b) : n.add(b); return n; });
+        const countFor = (b: string) => csvRows.filter(r => (r['Brand'] || r['brand'] || '') === b).length;
+        const total = csvRows.filter(r => selectedBrands.has(r['Brand'] || r['brand'] || '')).length;
+        return (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowBrandFilter(false)} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                <div className="p-6 pb-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-semibold">Filter by Brand</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">{csvRows.length} products in file · {total} selected</p>
+                    </div>
+                    <button onClick={() => setShowBrandFilter(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 space-y-1 max-h-72 overflow-y-auto">
+                  <button onClick={() => setSelectedBrands(new Set(allBrands))} className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors">Select all</button>
+                  <button onClick={() => setSelectedBrands(new Set())} className="w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">Deselect all</button>
+                  <div className="border-t border-gray-100 mt-1 pt-1 space-y-0.5">
+                    {allBrands.map(brand => (
+                      <label key={brand} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={selectedBrands.has(brand)} onChange={() => toggleBrand(brand)} className="w-4 h-4 rounded accent-black" />
+                        <span className="flex-1 text-sm font-medium">{brand}</span>
+                        <span className="text-xs text-muted-foreground">{countFor(brand)}</span>
+                      </label>
+                    ))}
+                    {noBrand > 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">{noBrand} rows with no brand (always included)</div>
+                    )}
+                  </div>
+                </div>
+                <div className="p-4 pt-3 border-t border-gray-100 flex gap-3">
+                  <button onClick={() => setShowBrandFilter(false)} className="flex-1 px-4 py-2.5 text-sm border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">Cancel</button>
+                  <button onClick={handleConfirmImport} disabled={importing || selectedBrands.size === 0} className="flex-1 px-4 py-2.5 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                    {importing && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Import {total > 0 ? `${total} products` : ''}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
