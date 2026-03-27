@@ -133,7 +133,7 @@ async function create({
 
 async function update(id, fields) {
   const allowed = [
-    'product_url', 'external_title', 'external_sku', 'external_barcode',
+    'product_id', 'product_url', 'external_title', 'external_sku', 'external_barcode',
     'selector_price', 'selector_title', 'selector_availability',
     'price_selectors', 'title_selectors', 'availability_selectors',
     'currency', 'is_active', 'last_status', 'last_checked_at', 'image_url',

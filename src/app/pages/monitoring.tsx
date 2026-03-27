@@ -136,7 +136,7 @@ function ProductUrlsTab() {
     setSaving(true);
     try {
       if (editTarget) {
-        await urlsApi.update(editTarget.id, { product_url: form.product_url, currency: form.currency });
+        await urlsApi.update(editTarget.id, { product_id: Number(form.product_id), product_url: form.product_url, currency: form.currency });
         toast.success('URL updated');
       } else {
         await urlsApi.create({ product_id: Number(form.product_id), company_id: Number(form.company_id), product_url: form.product_url, currency: form.currency });
@@ -316,27 +316,25 @@ function ProductUrlsTab() {
                 <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-gray-100 rounded"><X className="w-5 h-5 text-gray-600" /></button>
               </div>
               <form onSubmit={handleSave} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Product *</label>
+                  <SearchableSelect
+                    placeholder="Select product"
+                    options={products.map(p => ({ value: String(p.id), label: p.internal_name }))}
+                    value={form.product_id}
+                    onChange={v => setForm(f => ({ ...f, product_id: v }))}
+                  />
+                </div>
                 {!editTarget && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Product *</label>
-                      <SearchableSelect
-                        placeholder="Select product"
-                        options={products.map(p => ({ value: String(p.id), label: p.internal_name }))}
-                        value={form.product_id}
-                        onChange={v => setForm(f => ({ ...f, product_id: v }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
-                      <SearchableSelect
-                        placeholder="Select company"
-                        options={companies.map(c => ({ value: String(c.id), label: c.name }))}
-                        value={form.company_id}
-                        onChange={v => setForm(f => ({ ...f, company_id: v }))}
-                      />
-                    </div>
-                  </>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
+                    <SearchableSelect
+                      placeholder="Select company"
+                      options={companies.map(c => ({ value: String(c.id), label: c.name }))}
+                      value={form.company_id}
+                      onChange={v => setForm(f => ({ ...f, company_id: v }))}
+                    />
+                  </div>
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Product URL *</label>
